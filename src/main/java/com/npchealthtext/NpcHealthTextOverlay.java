@@ -58,12 +58,8 @@ public class NpcHealthTextOverlay extends Overlay
 
 		for (NPC npc : client.getNpcs())
 		{
-			if (npc == null || npc.getName() == null || npc.isDead())
+			if (npc == null || npc.getName() == null)
 			{
-				if (npc != null)
-				{
-					lastHpMap.remove(npc);
-				}
 				continue;
 			}
 
@@ -80,7 +76,19 @@ public class NpcHealthTextOverlay extends Overlay
 			int ratio = npc.getHealthRatio();
 			int scale = npc.getHealthScale();
 
-			if (ratio >= 0 && scale > 0)
+			if (npc.isDead())
+			{
+				ratio = 0;
+				if (scale <= 0 && lastHpMap.containsKey(npc))
+				{
+					scale = lastHpMap.get(npc)[1];
+				}
+				if (scale <= 0)
+				{
+					scale = 30;
+				}
+			}
+			else if (ratio >= 0 && scale > 0)
 			{
 				lastHpMap.put(npc, new int[]{ratio, scale});
 			}
