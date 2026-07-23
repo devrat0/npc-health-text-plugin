@@ -308,7 +308,7 @@ public class NpcHealthTextOverlay extends Overlay
 			OverlayPositionMode posMode = config.overlayPosition();
 			if (posMode == null)
 			{
-				posMode = OverlayPositionMode.ABOVE;
+				posMode = OverlayPositionMode.TOP;
 			}
 
 			switch (posMode)
@@ -319,7 +319,7 @@ public class NpcHealthTextOverlay extends Overlay
 				case BOTTOM:
 					baseHeight = 0;
 					break;
-				case ABOVE:
+				case TOP:
 				default:
 					baseHeight = logicalHeight;
 					break;

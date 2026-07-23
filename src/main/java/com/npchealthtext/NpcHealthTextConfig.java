@@ -111,13 +111,13 @@ public interface NpcHealthTextConfig extends Config
 	@ConfigItem(
 		keyName = "overlayPosition",
 		name = "Overlay Position",
-		description = "Anchor position for HP text overlay relative to the NPC: Above (default), Middle, or Bottom",
+		description = "Anchor position for HP text overlay relative to the NPC: Top (default), Middle, or Bottom",
 		position = 6,
 		section = "hpOptions"
 	)
 	default OverlayPositionMode overlayPosition()
 	{
-		return OverlayPositionMode.ABOVE;
+		return OverlayPositionMode.TOP;
 	}
 
 	@ConfigItem(

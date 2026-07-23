@@ -2,7 +2,7 @@ package com.npchealthtext;
 
 public enum OverlayPositionMode
 {
-	ABOVE("Above"),
+	TOP("Top"),
 	MIDDLE("Middle"),
 	BOTTOM("Bottom");
 
