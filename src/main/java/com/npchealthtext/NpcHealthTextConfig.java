@@ -37,21 +37,21 @@ public interface NpcHealthTextConfig extends Config
 	// ──────────────────────────────────────────────
 
 	@ConfigItem(
-		keyName = "showForAllNpcs",
-		name = "Show for All NPCs",
-		description = "Display the HP text overlay for all NPCs. If disabled, overlay only displays for NPCs in the NPC Names list.",
+		keyName = "npcDisplayMode",
+		name = "NPC Display Mode",
+		description = "Choose which NPCs to show HP text on: Show Target NPC (only the NPC you are currently attacking) or Show All (all visible NPCs)",
 		position = 0,
 		section = "hpOptions"
 	)
-	default boolean showForAllNpcs()
+	default NpcDisplayMode npcDisplayMode()
 	{
-		return true;
+		return NpcDisplayMode.SHOW_TARGET_NPC;
 	}
 
 	@ConfigItem(
 		keyName = "npcNames",
 		name = "NPC Names List",
-		description = "Comma-separated list of NPC names to display overlay for (when 'Show for All NPCs' is disabled)",
+		description = "Comma-separated list of NPC names to display overlay for (optional filter)",
 		position = 1,
 		section = "hpOptions"
 	)
@@ -74,7 +74,7 @@ public interface NpcHealthTextConfig extends Config
 
 	@ConfigItem(
 		keyName = "displayMode",
-		name = "Display Mode",
+		name = "HP Text Format",
 		description = "Choose how health is displayed: HP Value (325/900), HP Percentage (36%), or Both (325/900 (36%))",
 		position = 3,
 		section = "hpOptions"
@@ -117,6 +117,18 @@ public interface NpcHealthTextConfig extends Config
 		section = "hpOptions"
 	)
 	default boolean showAfterHealthBarDisappears()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "showWithoutHealthBar",
+		name = "Show Before HP Bar Appears",
+		description = "Display HP text overlay for visible NPCs even before they take damage or show an in-game overhead health bar (assumes 100% HP)",
+		position = 7,
+		section = "hpOptions"
+	)
+	default boolean showWithoutHealthBar()
 	{
 		return true;
 	}

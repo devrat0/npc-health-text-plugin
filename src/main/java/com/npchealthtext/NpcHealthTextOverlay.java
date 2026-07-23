@@ -8,11 +8,16 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.inject.Inject;
+import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.NPC;
+import net.runelite.api.Player;
 import net.runelite.api.Point;
 import net.runelite.api.events.NpcDespawned;
+import net.runelite.api.widgets.Widget;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.NPCManager;
 import net.runelite.client.ui.FontManager;
@@ -22,10 +27,16 @@ import net.runelite.client.ui.overlay.OverlayPosition;
 
 public class NpcHealthTextOverlay extends Overlay
 {
+	private static final Pattern HP_PATTERN = Pattern.compile("(\\d+)\\s*/\\s*(\\d+)");
+
 	private final Client client;
 	private final NpcHealthTextConfig config;
 	private final NPCManager npcManager;
 	private final Map<NPC, int[]> lastHpMap = new ConcurrentHashMap<>();
+
+	private NPC lastTargetNpc = null;
+	private String lastTargetName = null;
+	private long lastTargetTime = 0;
 
 	@Inject
 	public NpcHealthTextOverlay(Client client, NpcHealthTextConfig config, NPCManager npcManager)
@@ -41,9 +52,13 @@ public class NpcHealthTextOverlay extends Overlay
 	@Subscribe
 	public void onNpcDespawned(NpcDespawned event)
 	{
-		if (event.getNpc() != null)
+		if (event != null && event.getNpc() != null)
 		{
 			lastHpMap.remove(event.getNpc());
+			if (lastTargetNpc == event.getNpc())
+			{
+				lastTargetNpc = null;
+			}
 		}
 	}
 
@@ -56,18 +71,83 @@ public class NpcHealthTextOverlay extends Overlay
 		graphics.setFont(font);
 		FontMetrics fm = graphics.getFontMetrics(font);
 
-		for (NPC npc : client.getNpcs())
+		Player localPlayer = client.getLocalPlayer();
+		Actor currentInteracting = localPlayer != null ? localPlayer.getInteracting() : null;
+
+		Iterable<NPC> npcs = client.getNpcs();
+		if (npcs == null)
 		{
-			if (npc == null || npc.getName() == null)
+			return null;
+		}
+
+		if (currentInteracting instanceof NPC)
+		{
+			lastTargetNpc = (NPC) currentInteracting;
+			if (lastTargetNpc.getName() != null)
+			{
+				lastTargetName = lastTargetNpc.getName();
+			}
+			lastTargetTime = System.currentTimeMillis();
+		}
+		else if (localPlayer != null)
+		{
+			for (NPC n : npcs)
+			{
+				if (n != null && n.getInteracting() == localPlayer)
+				{
+					lastTargetNpc = n;
+					if (n.getName() != null)
+					{
+						lastTargetName = n.getName();
+					}
+					lastTargetTime = System.currentTimeMillis();
+					break;
+				}
+			}
+		}
+
+		for (NPC npc : npcs)
+		{
+			if (npc == null || npc.getName() == null || npc.getName().trim().isEmpty())
 			{
 				continue;
 			}
 
-			// Filter NPCs based on 'Show for All NPCs' and 'NPC Names List'
-			if (!config.showForAllNpcs())
+			String npcName = npc.getName();
+
+			// Filter based on NPC Display Mode (Show Target NPC vs Show All)
+			NpcDisplayMode npcMode = config.npcDisplayMode();
+			if (npcMode == null || npcMode == NpcDisplayMode.SHOW_TARGET_NPC)
 			{
-				String npcName = npc.getName();
-				if (npcName == null || !isNameInList(npcName, config.npcNames()))
+				boolean isTarget = false;
+				if (currentInteracting == npc)
+				{
+					isTarget = true;
+				}
+				else if (localPlayer != null && npc.getInteracting() == localPlayer)
+				{
+					isTarget = true;
+				}
+				else if (lastTargetNpc == npc && !npc.isDead() && (System.currentTimeMillis() - lastTargetTime < 5000))
+				{
+					isTarget = true;
+				}
+				else if (lastTargetName != null && npcName.equalsIgnoreCase(lastTargetName) && !npc.isDead() && (System.currentTimeMillis() - lastTargetTime < 5000))
+				{
+					isTarget = true;
+				}
+
+				if (!isTarget)
+				{
+					continue;
+				}
+			}
+
+			// Filter based on NPC Names List if specified
+			String nameList = config.npcNames();
+			if (nameList != null && !nameList.trim().isEmpty())
+			{
+				if (!isNameInList(npcName, nameList))
 				{
 					continue;
 				}
@@ -92,11 +172,19 @@ public class NpcHealthTextOverlay extends Overlay
 			{
 				lastHpMap.put(npc, new int[]{ratio, scale});
 			}
-			else if (config.showAfterHealthBarDisappears() && lastHpMap.containsKey(npc))
+			else if (lastHpMap.containsKey(npc))
 			{
-				int[] cached = lastHpMap.get(npc);
-				ratio = cached[0];
-				scale = cached[1];
+				if (config.showAfterHealthBarDisappears())
+				{
+					int[] cached = lastHpMap.get(npc);
+					ratio = cached[0];
+					scale = cached[1];
+				}
+			}
+			else if (config.showWithoutHealthBar())
+			{
+				ratio = 100;
+				scale = 100;
 			}
 
 			// Only display overlay if ratio >= 0 and scale > 0
@@ -111,7 +199,34 @@ public class NpcHealthTextOverlay extends Overlay
 				continue;
 			}
 
-			int maxHp = npcManager.getHealth(npc.getId());
+			int maxHp = 0;
+			int overrideCurrentHp = -1;
+
+			// 1. Try standard RuneLite function first (npcManager.getHealth)
+			if (npcManager != null)
+			{
+				try
+				{
+					maxHp = npcManager.getHealth(npc.getId());
+					if (maxHp <= 0 && npc.getTransformedComposition() != null)
+					{
+						maxHp = npcManager.getHealth(npc.getTransformedComposition().getId());
+					}
+				}
+				catch (Exception ignored)
+				{
+					maxHp = 0;
+				}
+			}
+
+			// 2. Fallback: If standard function returns <= 0 (or for live scaled boss HP), check top-of-screen Boss Bar widget
+			int[] bossWidgetHp = getBossHealthFromWidget();
+			if (bossWidgetHp != null && bossWidgetHp.length >= 2)
+			{
+				overrideCurrentHp = bossWidgetHp[0];
+				maxHp = bossWidgetHp[1];
+			}
+
 			DisplayMode mode = config.displayMode();
 			if (mode == null)
 			{
@@ -121,7 +236,7 @@ public class NpcHealthTextOverlay extends Overlay
 			String text;
 			if (maxHp > 0)
 			{
-				int currentHp = (int) Math.round((double) maxHp * ratio / scale);
+				int currentHp = (overrideCurrentHp >= 0) ? overrideCurrentHp : (int) Math.round((double) maxHp * ratio / scale);
 				if (currentHp == 0 && ratio > 0)
 				{
 					currentHp = 1;
@@ -130,13 +245,14 @@ public class NpcHealthTextOverlay extends Overlay
 				String valStr = String.format("%d / %d", currentHp, maxHp);
 
 				String pctStr;
+				double hpFraction = (overrideCurrentHp >= 0 && maxHp > 0) ? ((double) currentHp / maxHp) : ((double) ratio / scale);
 				if (config.showDecimalPercentage())
 				{
-					pctStr = String.format("%.1f%%", ((double) ratio / scale) * 100.0);
+					pctStr = String.format("%.1f%%", hpFraction * 100.0);
 				}
 				else
 				{
-					int pctInt = (int) Math.round(((double) ratio / scale) * 100.0);
+					int pctInt = (int) Math.round(hpFraction * 100.0);
 					if (pctInt == 0 && ratio > 0)
 					{
 						pctInt = 1;
@@ -176,12 +292,27 @@ public class NpcHealthTextOverlay extends Overlay
 			}
 
 			// Determine dynamic canvas text location above NPC's health bar
-			int zOffset = npc.getLogicalHeight() + config.heightOffset();
+			int logicalHeight = Math.max(0, npc.getLogicalHeight());
+			int zOffset = logicalHeight + config.heightOffset();
 			Point textLocation = npc.getCanvasTextLocation(graphics, text, zOffset);
+
+			if (textLocation == null)
+			{
+				textLocation = npc.getCanvasTextLocation(graphics, text, logicalHeight);
+			}
+			if (textLocation == null)
+			{
+				textLocation = npc.getCanvasTextLocation(graphics, text, 0);
+			}
+
 			if (textLocation == null)
 			{
 				continue;
 			}
+
+			int drawX = textLocation.getX();
+			int drawY = Math.max(20, textLocation.getY());
+			Point location = new Point(drawX, drawY);
 
 			// Determine text color (dynamic gradient vs static)
 			Color textColor;
@@ -206,15 +337,15 @@ public class NpcHealthTextOverlay extends Overlay
 
 				int bubbleWidth = textWidth + paddingX * 2;
 				int bubbleHeight = textHeight + paddingY * 2;
-				int bubbleX = textLocation.getX() - paddingX;
-				int bubbleY = textLocation.getY() - fm.getAscent() - paddingY;
+				int bubbleX = location.getX() - paddingX;
+				int bubbleY = location.getY() - fm.getAscent() - paddingY;
 
 				graphics.setColor(bgColor);
 				int roundness = config.bubbleRoundness();
 				graphics.fillRoundRect(bubbleX, bubbleY, bubbleWidth, bubbleHeight, roundness, roundness);
 			}
 
-			drawText(graphics, text, textLocation.getX(), textLocation.getY(), fm, textColor);
+			drawText(graphics, text, location.getX(), location.getY(), fm, textColor);
 		}
 
 		return null;
@@ -472,5 +603,77 @@ public class NpcHealthTextOverlay extends Overlay
 		}
 
 		drawStyledString(graphics, text, x, y, textColor);
+	}
+
+	private int[] getBossHealthFromWidget()
+	{
+		if (client == null)
+		{
+			return null;
+		}
+
+		try
+		{
+			Widget bossWidgetGroup = client.getWidget(303, 0);
+			if (bossWidgetGroup != null)
+			{
+				Widget[] children = bossWidgetGroup.getChildren();
+				if (children != null)
+				{
+					for (Widget child : children)
+					{
+						if (child == null || child.isHidden() || child.getText() == null)
+						{
+							continue;
+						}
+						int[] parsed = parseHpString(child.getText());
+						if (parsed != null)
+						{
+							return parsed;
+						}
+					}
+				}
+			}
+
+			for (int childId = 1; childId <= 25; childId++)
+			{
+				Widget w = client.getWidget(303, childId);
+				if (w != null && !w.isHidden() && w.getText() != null)
+				{
+					int[] parsed = parseHpString(w.getText());
+					if (parsed != null)
+					{
+						return parsed;
+					}
+				}
+			}
+		}
+		catch (Exception ignored) {}
+
+		return null;
+	}
+
+	private int[] parseHpString(String text)
+	{
+		if (text == null || text.trim().isEmpty())
+		{
+			return null;
+		}
+		try
+		{
+			String cleanText = text.replaceAll("<[^>]*>", "").trim();
+			Matcher matcher = HP_PATTERN.matcher(cleanText);
+			if (matcher.find())
+			{
+				int cur = Integer.parseInt(matcher.group(1));
+				int max = Integer.parseInt(matcher.group(2));
+				if (max > 0 && cur >= 0)
+				{
+					return new int[]{cur, max};
+				}
+			}
+		}
+		catch (Exception ignored) {}
+		return null;
 	}
 }
