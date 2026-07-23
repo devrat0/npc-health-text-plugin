@@ -50,8 +50,8 @@ public interface NpcHealthTextConfig extends Config
 
 	@ConfigItem(
 		keyName = "npcNames",
-		name = "NPC Names List",
-		description = "Comma-separated list of NPC names to display overlay for (optional filter)",
+		name = "NPC Whitelist",
+		description = "Comma-separated list of NPC names to display overlay for. Supports wildcards",
 		position = 1,
 		section = "hpOptions"
 	)
@@ -61,10 +61,22 @@ public interface NpcHealthTextConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "npcBlacklist",
+		name = "NPC Blacklist",
+		description = "Comma-separated list of NPC names to hide overlay for. Supports wildcards",
+		position = 2,
+		section = "hpOptions"
+	)
+	default String npcBlacklist()
+	{
+		return "";
+	}
+
+	@ConfigItem(
 		keyName = "hideIfFull",
 		name = "Hide if HP is Full",
 		description = "Hide the HP text overlay when the NPC is at full health",
-		position = 2,
+		position = 3,
 		section = "hpOptions"
 	)
 	default boolean hideIfFull()
@@ -76,7 +88,7 @@ public interface NpcHealthTextConfig extends Config
 		keyName = "displayMode",
 		name = "HP Text Format",
 		description = "Choose how health is displayed: HP Value (325/900), HP Percentage (36%), or Both (325/900 (36%))",
-		position = 3,
+		position = 4,
 		section = "hpOptions"
 	)
 	default DisplayMode displayMode()
@@ -88,7 +100,7 @@ public interface NpcHealthTextConfig extends Config
 		keyName = "showDecimalPercentage",
 		name = "Show Decimal Percentage",
 		description = "Include 1 decimal place in percentage (e.g., 36.1% vs 36%)",
-		position = 4,
+		position = 5,
 		section = "hpOptions"
 	)
 	default boolean showDecimalPercentage()
@@ -97,13 +109,25 @@ public interface NpcHealthTextConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "heightOffset",
-		name = "Height Offset",
-		description = "Vertical offset in game height units to position text above the NPC health bar",
-		position = 5,
+		keyName = "overlayPosition",
+		name = "Overlay Position",
+		description = "Anchor position for HP text overlay relative to the NPC: Above (default), Middle, or Bottom",
+		position = 6,
 		section = "hpOptions"
 	)
-	@Range(min = -50, max = 150)
+	default OverlayPositionMode overlayPosition()
+	{
+		return OverlayPositionMode.ABOVE;
+	}
+
+	@ConfigItem(
+		keyName = "heightOffset",
+		name = "Height Offset",
+		description = "Fine-tune vertical offset in game height units relative to the selected Overlay Position",
+		position = 7,
+		section = "hpOptions"
+	)
+	@Range(min = -200, max = 200)
 	default int heightOffset()
 	{
 		return 36;
@@ -113,7 +137,7 @@ public interface NpcHealthTextConfig extends Config
 		keyName = "showAfterHealthBarDisappears",
 		name = "Keep Text After HP Bar Disappears",
 		description = "Continue displaying the health text overlay even after the in-game health bar times out and disappears",
-		position = 6,
+		position = 8,
 		section = "hpOptions"
 	)
 	default boolean showAfterHealthBarDisappears()
@@ -125,7 +149,7 @@ public interface NpcHealthTextConfig extends Config
 		keyName = "showWithoutHealthBar",
 		name = "Show Before HP Bar Appears",
 		description = "Display HP text overlay for visible NPCs even before they take damage or show an in-game overhead health bar (assumes 100% HP)",
-		position = 7,
+		position = 9,
 		section = "hpOptions"
 	)
 	default boolean showWithoutHealthBar()

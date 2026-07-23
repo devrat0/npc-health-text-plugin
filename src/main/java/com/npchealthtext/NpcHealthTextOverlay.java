@@ -24,6 +24,7 @@ import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
+import net.runelite.client.util.WildcardMatcher;
 
 public class NpcHealthTextOverlay extends Overlay
 {
@@ -143,11 +144,21 @@ public class NpcHealthTextOverlay extends Overlay
 				}
 			}
 
-			// Filter based on NPC Names List if specified
+			// Filter based on NPC Names List (whitelist) if specified
 			String nameList = config.npcNames();
 			if (nameList != null && !nameList.trim().isEmpty())
 			{
 				if (!isNameInList(npcName, nameList))
+				{
+					continue;
+				}
+			}
+
+			// Filter based on NPC Blacklist if specified
+			String blacklist = config.npcBlacklist();
+			if (blacklist != null && !blacklist.trim().isEmpty())
+			{
+				if (isNameInList(npcName, blacklist))
 				{
 					continue;
 				}
@@ -291,14 +302,35 @@ public class NpcHealthTextOverlay extends Overlay
 				}
 			}
 
-			// Determine dynamic canvas text location above NPC's health bar
+			// Determine dynamic canvas text location based on Overlay Position configuration
 			int logicalHeight = Math.max(0, npc.getLogicalHeight());
-			int zOffset = logicalHeight + config.heightOffset();
+			int baseHeight;
+			OverlayPositionMode posMode = config.overlayPosition();
+			if (posMode == null)
+			{
+				posMode = OverlayPositionMode.ABOVE;
+			}
+
+			switch (posMode)
+			{
+				case MIDDLE:
+					baseHeight = logicalHeight / 2;
+					break;
+				case BOTTOM:
+					baseHeight = 0;
+					break;
+				case ABOVE:
+				default:
+					baseHeight = logicalHeight;
+					break;
+			}
+
+			int zOffset = baseHeight + config.heightOffset();
 			Point textLocation = npc.getCanvasTextLocation(graphics, text, zOffset);
 
 			if (textLocation == null)
 			{
-				textLocation = npc.getCanvasTextLocation(graphics, text, logicalHeight);
+				textLocation = npc.getCanvasTextLocation(graphics, text, baseHeight);
 			}
 			if (textLocation == null)
 			{
@@ -353,7 +385,7 @@ public class NpcHealthTextOverlay extends Overlay
 
 	private boolean isNameInList(String npcName, String rawList)
 	{
-		if (rawList == null || rawList.trim().isEmpty())
+		if (rawList == null || rawList.trim().isEmpty() || npcName == null)
 		{
 			return false;
 		}
@@ -362,7 +394,8 @@ public class NpcHealthTextOverlay extends Overlay
 		String[] parts = rawList.split(",");
 		for (String part : parts)
 		{
-			if (part.trim().toLowerCase().equals(lowerName))
+			String pattern = part.trim().toLowerCase();
+			if (!pattern.isEmpty() && WildcardMatcher.matches(pattern, lowerName))
 			{
 				return true;
 			}
