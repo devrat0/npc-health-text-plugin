@@ -1,11 +1,14 @@
 package com.npchealthtext;
 
+import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
+import java.awt.Polygon;
 import java.awt.RenderingHints;
+import java.awt.Shape;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -14,12 +17,14 @@ import javax.inject.Inject;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.NPC;
+import net.runelite.api.Perspective;
 import net.runelite.api.Player;
 import net.runelite.api.Point;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.api.widgets.Widget;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.NPCManager;
+import net.runelite.client.ui.overlay.outline.ModelOutlineRenderer;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
@@ -33,6 +38,8 @@ public class NpcHealthTextOverlay extends Overlay
 	private final Client client;
 	private final NpcHealthTextConfig config;
 	private final NPCManager npcManager;
+	private final ModelOutlineRenderer modelOutlineRenderer;
+	private final HpThresholdManager thresholdManager = new HpThresholdManager();
 	private final Map<NPC, int[]> lastHpMap = new ConcurrentHashMap<>();
 
 	private NPC lastTargetNpc = null;
@@ -53,11 +60,12 @@ public class NpcHealthTextOverlay extends Overlay
 	}
 
 	@Inject
-	public NpcHealthTextOverlay(Client client, NpcHealthTextConfig config, NPCManager npcManager)
+	public NpcHealthTextOverlay(Client client, NpcHealthTextConfig config, NPCManager npcManager, ModelOutlineRenderer modelOutlineRenderer)
 	{
 		this.client = client;
 		this.config = config;
 		this.npcManager = npcManager;
+		this.modelOutlineRenderer = modelOutlineRenderer;
 
 		setPosition(OverlayPosition.DYNAMIC);
 		setLayer(OverlayLayer.UNDER_WIDGETS);
@@ -337,6 +345,68 @@ public class NpcHealthTextOverlay extends Overlay
 						pctInt = 1;
 					}
 					text = String.format("%d%%", pctInt);
+				}
+			}
+
+			if (config.enableHpThresholds())
+			{
+				double currentHpPct = (maxHp > 0)
+					? (((overrideCurrentHp >= 0 ? (double) overrideCurrentHp : (double) Math.round((double) maxHp * ratio / scale)) / maxHp) * 100.0)
+					: (((double) ratio / scale) * 100.0);
+
+				HpThresholdRule thresholdRule = thresholdManager.getMatchingThreshold(
+					npcName, currentHpPct, config.npcThresholdOverrides(), config.globalThresholds());
+
+				if (thresholdRule != null)
+				{
+					Color thresholdColor = thresholdRule.getColor();
+
+					// 1. Tile Glow
+					if (config.globalTileGlow() && thresholdRule.containsStyle(IndicatorStyle.TILE))
+					{
+						if (npc.getLocalLocation() != null)
+						{
+							Polygon tilePoly = Perspective.getCanvasTilePoly(client, npc.getLocalLocation());
+							if (tilePoly != null)
+							{
+								renderShape(graphics, tilePoly, thresholdColor, config.globalTileFillOpacity(), config.globalTileBorderWidth());
+							}
+						}
+					}
+
+					// 2. Hull Glow
+					if (config.globalHullGlow() && thresholdRule.containsStyle(IndicatorStyle.HULL))
+					{
+						Shape hull = npc.getConvexHull();
+						if (hull != null)
+						{
+							renderShape(graphics, hull, thresholdColor, config.globalHullFillOpacity(), config.globalHullBorderWidth());
+						}
+					}
+
+					// 3. Border Glow (Pulsing model outline surrounding NPC)
+					if (config.globalBorderGlow() && thresholdRule.containsStyle(IndicatorStyle.BORDER))
+					{
+						if (modelOutlineRenderer != null)
+						{
+							Color pulseColor = getPulsingColor(thresholdColor, config.borderPulseSpeed());
+							modelOutlineRenderer.drawOutline(npc, config.globalBorderWidth(), pulseColor, 0);
+						}
+					}
+
+					// 4. Text Icon
+					if (config.globalTextIcon() && thresholdRule.containsStyle(IndicatorStyle.ICON))
+					{
+						String icon = thresholdRule.getIconSymbol();
+						if (icon == null || icon.trim().isEmpty())
+						{
+							icon = config.thresholdIconSymbol();
+						}
+						if (icon != null && !icon.trim().isEmpty())
+						{
+							text = text + " " + icon.trim();
+						}
+					}
 				}
 			}
 
@@ -803,4 +873,40 @@ public class NpcHealthTextOverlay extends Overlay
 		catch (Exception ignored) {}
 		return null;
 	}
+
+	private void renderShape(Graphics2D graphics, Shape shape, Color color, int fillOpacity, int borderWidth)
+	{
+		if (shape == null || color == null)
+		{
+			return;
+		}
+		Color fillColor = new Color(color.getRed(), color.getGreen(), color.getBlue(), Math.max(0, Math.min(255, fillOpacity)));
+		graphics.setColor(fillColor);
+		graphics.fill(shape);
+
+		graphics.setColor(color);
+		graphics.setStroke(new BasicStroke((float) borderWidth));
+		graphics.draw(shape);
+	}
+
+	private Color getPulsingColor(Color baseColor, double speedMs)
+	{
+		if (baseColor == null)
+		{
+			return Color.RED;
+		}
+		if (!config.globalBorderPulse())
+		{
+			return baseColor;
+		}
+		long time = System.currentTimeMillis();
+		double speed = Math.max(100.0, speedMs);
+		double pulse = (Math.sin((time % (long) speed) * (2.0 * Math.PI / speed)) + 1.0) / 2.0;
+		int minAlpha = 50;
+		int maxAlpha = 255;
+		int alpha = (int) Math.round(minAlpha + pulse * (maxAlpha - minAlpha));
+		alpha = Math.max(0, Math.min(255, alpha));
+		return new Color(baseColor.getRed(), baseColor.getGreen(), baseColor.getBlue(), alpha);
+	}
 }
+

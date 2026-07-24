@@ -12,8 +12,8 @@ import net.runelite.client.ui.overlay.OverlayManager;
 @Slf4j
 @PluginDescriptor(
 	name = "NPC Health Text",
-	description = "Adds a small, highly customizable text overlay above NPC health bars showing current health and percentage.",
-	tags = {"health", "hp", "overlay", "npc", "bar", "text"},
+	description = "Adds a small, highly customizable text overlay above NPC health bars showing current health, percentage, and HP thresholds.",
+	tags = {"health", "hp", "overlay", "npc", "bar", "text", "threshold"},
 	enabledByDefault = true
 )
 public class NpcHealthTextPlugin extends Plugin

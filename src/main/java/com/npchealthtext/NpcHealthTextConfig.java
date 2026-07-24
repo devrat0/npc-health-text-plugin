@@ -316,4 +316,202 @@ public interface NpcHealthTextConfig extends Config
 	{
 		return 6;
 	}
+
+	// ──────────────────────────────────────────────
+	//  HP THRESHOLDS
+	// ──────────────────────────────────────────────
+
+	@ConfigSection(
+		name = "HP Thresholds",
+		description = "Configure HP threshold indicators, styles, global rules, and NPC overrides",
+		position = 3
+	)
+	String thresholdSection = "hpThresholds";
+
+	@ConfigItem(
+		keyName = "enableHpThresholds",
+		name = "Enable HP Thresholds",
+		description = "Enable visual indicators (tile glow, hull glow, text icon) when NPCs drop below specified HP percentages",
+		position = 0,
+		section = "hpThresholds"
+	)
+	default boolean enableHpThresholds()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "globalThresholds",
+		name = "Global HP Thresholds",
+		description = "Default HP threshold rules for all NPCs when no specific NPC override exists. Format: THRESHOLD_PERCENT:COLOR (e.g. 10:red)",
+		position = 1,
+		section = "hpThresholds"
+	)
+	default String globalThresholds()
+	{
+		return "10:red";
+	}
+
+	@ConfigItem(
+		keyName = "globalTileGlow",
+		name = "Enable Tile Glow",
+		description = "Glow/highlight the NPC's ground tile polygon when an active threshold is met",
+		position = 2,
+		section = "hpThresholds"
+	)
+	default boolean globalTileGlow()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "globalTileFillOpacity",
+		name = "Tile Fill Opacity",
+		description = "Opacity/alpha of the tile glow fill (0 = transparent, 255 = fully opaque)",
+		position = 3,
+		section = "hpThresholds"
+	)
+	@Range(min = 0, max = 255)
+	default int globalTileFillOpacity()
+	{
+		return 50;
+	}
+
+	@ConfigItem(
+		keyName = "globalTileBorderWidth",
+		name = "Tile Border Width",
+		description = "Border stroke width in pixels for tile glow",
+		position = 4,
+		section = "hpThresholds"
+	)
+	@Range(min = 1, max = 5)
+	default int globalTileBorderWidth()
+	{
+		return 2;
+	}
+
+	@ConfigItem(
+		keyName = "globalHullGlow",
+		name = "Enable Hull Glow",
+		description = "Glow/highlight the 3D model convex hull of the NPC when an active threshold is met",
+		position = 5,
+		section = "hpThresholds"
+	)
+	default boolean globalHullGlow()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "globalHullFillOpacity",
+		name = "Hull Fill Opacity",
+		description = "Opacity/alpha of the convex hull glow fill (0 = transparent, 255 = fully opaque)",
+		position = 6,
+		section = "hpThresholds"
+	)
+	@Range(min = 0, max = 255)
+	default int globalHullFillOpacity()
+	{
+		return 50;
+	}
+
+	@ConfigItem(
+		keyName = "globalHullBorderWidth",
+		name = "Hull Border Width",
+		description = "Border stroke width in pixels for convex hull glow",
+		position = 7,
+		section = "hpThresholds"
+	)
+	@Range(min = 1, max = 5)
+	default int globalHullBorderWidth()
+	{
+		return 2;
+	}
+
+	@ConfigItem(
+		keyName = "globalBorderGlow",
+		name = "Enable Border Glow",
+		description = "Outline glow surrounding the NPC model when an active threshold is met",
+		position = 8,
+		section = "hpThresholds"
+	)
+	default boolean globalBorderGlow()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "globalBorderWidth",
+		name = "Border Glow Width",
+		description = "Pixel width of the model border glow outline",
+		position = 9,
+		section = "hpThresholds"
+	)
+	@Range(min = 1, max = 8)
+	default int globalBorderWidth()
+	{
+		return 3;
+	}
+
+	@ConfigItem(
+		keyName = "globalBorderPulse",
+		name = "Pulse Border Glow",
+		description = "Pulsing animation for the model border glow outline",
+		position = 10,
+		section = "hpThresholds"
+	)
+	default boolean globalBorderPulse()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "borderPulseSpeed",
+		name = "Pulse Speed (ms)",
+		description = "Duration of one full glow pulse cycle in milliseconds (lower is faster)",
+		position = 11,
+		section = "hpThresholds"
+	)
+	@Range(min = 200, max = 2000)
+	default int borderPulseSpeed()
+	{
+		return 800;
+	}
+
+	@ConfigItem(
+		keyName = "globalTextIcon",
+		name = "Enable Text Icon",
+		description = "Display an indicator icon symbol next to the HP text overlay when an active threshold is met",
+		position = 8,
+		section = "hpThresholds"
+	)
+	default boolean globalTextIcon()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "thresholdIconSymbol",
+		name = "Threshold Icon Symbol",
+		description = "Text symbol to display next to the HP overlay when a threshold triggers (e.g. [!], ⚠, ⚡, ▼, ★, ●)",
+		position = 9,
+		section = "hpThresholds"
+	)
+	default String thresholdIconSymbol()
+	{
+		return "[!]";
+	}
+
+	@ConfigItem(
+		keyName = "npcThresholdOverrides",
+		name = "NPC Threshold Overrides",
+		description = "Comma or line separated list of custom NPC rules. Format: NPC:THRESHOLD_PCT:COLOR[:ICON][:STYLES] (e.g. Ba-Ba:66:yellow:⚡, Ba-Ba:33:orange:💀)",
+		position = 10,
+		section = "hpThresholds"
+	)
+	default String npcThresholdOverrides()
+	{
+		return "";
+	}
 }
+
