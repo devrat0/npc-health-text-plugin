@@ -146,21 +146,38 @@ public class NpcHealthTextOverlay extends Overlay
 				isTarget = true;
 			}
 
-			// Filter based on NPC Display Mode (Show Target NPC vs Show All)
+			// Filter based on NPC Display Mode
 			NpcDisplayMode npcMode = config.npcDisplayMode();
-			if ((npcMode == null || npcMode == NpcDisplayMode.SHOW_TARGET_NPC) && !isTarget)
+			if (npcMode == null)
 			{
-				continue;
+				npcMode = NpcDisplayMode.SHOW_TARGET_NPC;
 			}
 
-			// Filter based on NPC Names List (whitelist) if specified
 			String nameList = config.npcNames();
-			if (nameList != null && !nameList.trim().isEmpty())
+
+			switch (npcMode)
 			{
-				if (!isNameInList(npcName, nameList))
-				{
-					continue;
-				}
+				case SHOW_TARGET_NPC:
+					if (!isTarget)
+					{
+						continue;
+					}
+					break;
+				case SHOW_WHITELISTED:
+					if (!isNameInList(npcName, nameList))
+					{
+						continue;
+					}
+					break;
+				case SHOW_WHITELIST_TARGET:
+					if (!isTarget || !isNameInList(npcName, nameList))
+					{
+						continue;
+					}
+					break;
+				case SHOW_ALL:
+				default:
+					break;
 			}
 
 			// Filter based on NPC Blacklist if specified

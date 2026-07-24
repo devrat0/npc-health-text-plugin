@@ -39,7 +39,7 @@ public interface NpcHealthTextConfig extends Config
 	@ConfigItem(
 		keyName = "npcDisplayMode",
 		name = "NPC Display Mode",
-		description = "Choose which NPCs to show HP text on: Show Target NPC (only the NPC you are currently attacking) or Show All (all visible NPCs)",
+		description = "Choose which NPCs to show HP text on: Show Target NPC (only target), Show All (all visible NPCs), Show Whitelisted (all visible NPCs on the whitelist), or Show Whitelist Target (target NPC if on the whitelist)",
 		position = 0,
 		section = "hpOptions"
 	)
@@ -51,7 +51,7 @@ public interface NpcHealthTextConfig extends Config
 	@ConfigItem(
 		keyName = "npcNames",
 		name = "NPC Whitelist",
-		description = "Comma-separated list of NPC names to display overlay for. Supports wildcards",
+		description = "Comma-separated list of NPC names to display overlay for (used when NPC Display Mode is Show Whitelisted or Show Whitelist Target). Supports wildcards",
 		position = 1,
 		section = "hpOptions"
 	)
@@ -245,7 +245,7 @@ public interface NpcHealthTextConfig extends Config
 	)
 	default Color highHpColor()
 	{
-		return new Color(0, 255, 0);
+		return new Color(0, 100, 0);
 	}
 
 	@Alpha
