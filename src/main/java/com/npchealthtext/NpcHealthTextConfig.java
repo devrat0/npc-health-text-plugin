@@ -87,7 +87,7 @@ public interface NpcHealthTextConfig extends Config
 	@ConfigItem(
 		keyName = "displayMode",
 		name = "HP Text Format",
-		description = "Choose how health is displayed (applies to all non-target NPCs): HP Value (325/900), HP Percentage (36%), or Both (325/900 (36%))",
+		description = "Choose how health is displayed: HP Value (325/900), HP Percentage (36%), or Both (325/900 (36%))",
 		position = 4,
 		section = "hpOptions"
 	)

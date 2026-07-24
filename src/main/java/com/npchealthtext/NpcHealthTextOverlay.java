@@ -279,7 +279,7 @@ public class NpcHealthTextOverlay extends Overlay
 			DisplayMode mode = config.displayMode();
 			if (mode == null)
 			{
-				mode = DisplayMode.HP_PERCENTAGE;
+				mode = DisplayMode.BOTH;
 			}
 
 			if (isTarget)

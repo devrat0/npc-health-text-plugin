@@ -2,7 +2,7 @@ package com.npchealthtext;
 
 public enum TargetDisplayMode
 {
-	DEFAULT("Default (Use HP Text Format)"),
+	DEFAULT("Default"),
 	HP_VALUE("HP Value"),
 	HP_PERCENTAGE("HP Percentage"),
 	BOTH("Both");
