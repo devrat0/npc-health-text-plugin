@@ -33,7 +33,9 @@ public class NpcHealthTextOverlay extends Overlay
 	private final Client client;
 	private final NpcHealthTextConfig config;
 	private final NPCManager npcManager;
-	private final Map<NPC, int[]> lastHpMap = new ConcurrentHashMap<>();
+	private final Map<Integer, int[]> lastHpMap = new ConcurrentHashMap<>();
+	private final Map<String, Integer> bossMaxHpCache = new ConcurrentHashMap<>();
+	private final Map<Integer, Integer> npcIndexMaxHpCache = new ConcurrentHashMap<>();
 
 	private NPC lastTargetNpc = null;
 	private long lastTargetTime = 0;
@@ -68,11 +70,29 @@ public class NpcHealthTextOverlay extends Overlay
 	{
 		if (event != null && event.getNpc() != null)
 		{
-			lastHpMap.remove(event.getNpc());
+			int index = event.getNpc().getIndex();
+			lastHpMap.remove(index);
+			npcIndexMaxHpCache.remove(index);
 			if (lastTargetNpc == event.getNpc())
 			{
 				lastTargetNpc = null;
 			}
+		}
+	}
+
+	private Point getSafeCanvasTextLocation(Graphics2D graphics, NPC npc, String text, int zOffset)
+	{
+		if (npc == null || graphics == null || text == null)
+		{
+			return null;
+		}
+		try
+		{
+			return npc.getCanvasTextLocation(graphics, text, zOffset);
+		}
+		catch (Exception ignored)
+		{
+			return null;
 		}
 	}
 
@@ -101,13 +121,20 @@ public class NpcHealthTextOverlay extends Overlay
 		}
 		else if (localPlayer != null)
 		{
-			for (NPC n : npcs)
+			if (lastTargetNpc != null && !lastTargetNpc.isDead() && lastTargetNpc.getInteracting() == localPlayer)
 			{
-				if (n != null && n.getInteracting() == localPlayer)
+				lastTargetTime = System.currentTimeMillis();
+			}
+			else
+			{
+				for (NPC n : npcs)
 				{
-					lastTargetNpc = n;
-					lastTargetTime = System.currentTimeMillis();
-					break;
+					if (n != null && n.getInteracting() == localPlayer)
+					{
+						lastTargetNpc = n;
+						lastTargetTime = System.currentTimeMillis();
+						break;
+					}
 				}
 			}
 		}
@@ -116,329 +143,392 @@ public class NpcHealthTextOverlay extends Overlay
 
 		for (NPC npc : npcs)
 		{
-			if (npc == null || npc.getName() == null || npc.getName().trim().isEmpty())
+			try
 			{
-				continue;
+				renderNpcOverlay(graphics, fm, npc, localPlayer, currentInteracting, bossWidgetData);
 			}
-
-			String npcName = npc.getName();
-
-			boolean bossBarActive = bossWidgetData != null && bossNameMatches(npcName, bossWidgetData.bossName);
-
-			boolean isTarget = false;
-			if (currentInteracting == npc)
+			catch (Exception ignored)
 			{
-				isTarget = true;
 			}
-			else if (localPlayer != null && npc.getInteracting() == localPlayer)
-			{
-				isTarget = true;
-			}
-			else if (lastTargetNpc == npc && !npc.isDead())
-			{
-				if (bossBarActive || System.currentTimeMillis() - lastTargetTime < 5000)
-				{
-					isTarget = true;
-				}
-			}
-			else if (bossBarActive && !npc.isDead() && lastTargetNpc == null)
-			{
-				isTarget = true;
-			}
-
-			// Filter based on NPC Display Mode
-			NpcDisplayMode npcMode = config.npcDisplayMode();
-			if (npcMode == null)
-			{
-				npcMode = NpcDisplayMode.SHOW_TARGET_NPC;
-			}
-
-			String nameList = config.npcNames();
-
-			switch (npcMode)
-			{
-				case SHOW_TARGET_NPC:
-					if (!isTarget)
-					{
-						continue;
-					}
-					break;
-				case SHOW_WHITELISTED:
-					if (!isNameInList(npcName, nameList))
-					{
-						continue;
-					}
-					break;
-				case SHOW_WHITELIST_TARGET:
-					if (!isTarget || !isNameInList(npcName, nameList))
-					{
-						continue;
-					}
-					break;
-				case SHOW_ALL:
-				default:
-					break;
-			}
-
-			// Filter based on NPC Blacklist if specified
-			String blacklist = config.npcBlacklist();
-			if (blacklist != null && !blacklist.trim().isEmpty())
-			{
-				if (isNameInList(npcName, blacklist))
-				{
-					continue;
-				}
-			}
-
-			int ratio = npc.getHealthRatio();
-			int scale = npc.getHealthScale();
-
-			if (npc.isDead())
-			{
-				ratio = 0;
-				if (scale <= 0 && lastHpMap.containsKey(npc))
-				{
-					scale = lastHpMap.get(npc)[1];
-				}
-				if (scale <= 0)
-				{
-					scale = 30;
-				}
-			}
-			else if (ratio >= 0 && scale > 0)
-			{
-				lastHpMap.put(npc, new int[]{ratio, scale});
-			}
-			else if (lastHpMap.containsKey(npc))
-			{
-				if (config.showAfterHealthBarDisappears())
-				{
-					int[] cached = lastHpMap.get(npc);
-					ratio = cached[0];
-					scale = cached[1];
-				}
-			}
-			else if (config.showWithoutHealthBar())
-			{
-				ratio = 100;
-				scale = 100;
-			}
-
-			// Only display overlay if ratio >= 0 and scale > 0
-			if (ratio < 0 || scale <= 0)
-			{
-				continue;
-			}
-
-			boolean isFull = (ratio == scale);
-			if (isFull && config.hideIfFull())
-			{
-				continue;
-			}
-
-			int maxHp = 0;
-			int overrideCurrentHp = -1;
-
-			// 1. Try standard RuneLite function first (npcManager.getHealth)
-			if (npcManager != null)
-			{
-				try
-				{
-					maxHp = npcManager.getHealth(npc.getId());
-					if (maxHp <= 0 && npc.getTransformedComposition() != null)
-					{
-						maxHp = npcManager.getHealth(npc.getTransformedComposition().getId());
-					}
-				}
-				catch (Exception ignored)
-				{
-					maxHp = 0;
-				}
-			}
-
-			// 2. Correlate Boss Bar widget HP for scaled raid bosses & boss overlays
-			if (bossWidgetData != null)
-			{
-				boolean nameMatches = (bossWidgetData.bossName == null || bossWidgetData.bossName.isEmpty()
-					|| bossNameMatches(npcName, bossWidgetData.bossName));
-
-				if (nameMatches)
-				{
-					if (bossWidgetData.maxHp > 0)
-					{
-						maxHp = bossWidgetData.maxHp;
-					}
-
-					if (isTarget && (currentInteracting == npc || lastTargetNpc == npc))
-					{
-						overrideCurrentHp = bossWidgetData.currentHp;
-					}
-				}
-			}
-
-			DisplayMode mode = config.displayMode();
-			if (mode == null)
-			{
-				mode = DisplayMode.BOTH;
-			}
-
-			if (isTarget)
-			{
-				TargetDisplayMode targetMode = config.targetDisplayMode();
-				if (targetMode != null && targetMode != TargetDisplayMode.DEFAULT)
-				{
-					switch (targetMode)
-					{
-						case HP_VALUE:
-							mode = DisplayMode.HP_VALUE;
-							break;
-						case HP_PERCENTAGE:
-							mode = DisplayMode.HP_PERCENTAGE;
-							break;
-						case BOTH:
-							mode = DisplayMode.BOTH;
-							break;
-					}
-				}
-			}
-
-			String text;
-			if (maxHp > 0)
-			{
-				int currentHp = (overrideCurrentHp >= 0) ? overrideCurrentHp : (int) Math.round((double) maxHp * ratio / scale);
-				if (currentHp == 0 && ratio > 0)
-				{
-					currentHp = 1;
-				}
-
-				String valStr = String.format("%d / %d", currentHp, maxHp);
-
-				String pctStr;
-				double hpFraction = (overrideCurrentHp >= 0 && maxHp > 0) ? ((double) currentHp / maxHp) : ((double) ratio / scale);
-				if (config.showDecimalPercentage())
-				{
-					pctStr = String.format("%.1f%%", hpFraction * 100.0);
-				}
-				else
-				{
-					int pctInt = (int) Math.round(hpFraction * 100.0);
-					if (pctInt == 0 && ratio > 0)
-					{
-						pctInt = 1;
-					}
-					pctStr = String.format("%d%%", pctInt);
-				}
-
-				switch (mode)
-				{
-					case HP_VALUE:
-						text = valStr;
-						break;
-					case HP_PERCENTAGE:
-						text = pctStr;
-						break;
-					case BOTH:
-					default:
-						text = String.format("%s (%s)", valStr, pctStr);
-						break;
-				}
-			}
-			else
-			{
-				if (config.showDecimalPercentage())
-				{
-					text = String.format("%.1f%%", ((double) ratio / scale) * 100.0);
-				}
-				else
-				{
-					int pctInt = (int) Math.round(((double) ratio / scale) * 100.0);
-					if (pctInt == 0 && ratio > 0)
-					{
-						pctInt = 1;
-					}
-					text = String.format("%d%%", pctInt);
-				}
-			}
-
-			// Determine dynamic canvas text location based on Overlay Position configuration
-			int logicalHeight = Math.max(0, npc.getLogicalHeight());
-			int baseHeight;
-			OverlayPositionMode posMode = config.overlayPosition();
-			if (posMode == null)
-			{
-				posMode = OverlayPositionMode.TOP;
-			}
-
-			switch (posMode)
-			{
-				case MIDDLE:
-					baseHeight = logicalHeight / 2;
-					break;
-				case BOTTOM:
-					baseHeight = 0;
-					break;
-				case TOP:
-				default:
-					baseHeight = logicalHeight;
-					break;
-			}
-
-			int zOffset = baseHeight + config.heightOffset();
-			Point textLocation = npc.getCanvasTextLocation(graphics, text, zOffset);
-
-			if (textLocation == null)
-			{
-				textLocation = npc.getCanvasTextLocation(graphics, text, baseHeight);
-			}
-			if (textLocation == null)
-			{
-				textLocation = npc.getCanvasTextLocation(graphics, text, 0);
-			}
-
-			if (textLocation == null)
-			{
-				continue;
-			}
-
-			int drawX = textLocation.getX();
-			int drawY = Math.max(20, textLocation.getY());
-			Point location = new Point(drawX, drawY);
-
-			// Determine text color (dynamic gradient vs static)
-			Color textColor;
-			if (config.dynamicTextColor())
-			{
-				double hpFraction = Math.max(0.0, Math.min(1.0, (double) ratio / scale));
-				textColor = getHpGradientColor(config.lowHpColor(), config.highHpColor(), hpFraction);
-			}
-			else
-			{
-				textColor = config.textColor();
-			}
-
-			// Optional background bubble
-			Color bgColor = config.bgColor();
-			if (bgColor.getAlpha() > 0)
-			{
-				int paddingX = config.bubblePaddingX();
-				int paddingY = config.bubblePaddingY();
-				int textWidth = fm.stringWidth(text);
-				int textHeight = fm.getHeight();
-
-				int bubbleWidth = textWidth + paddingX * 2;
-				int bubbleHeight = textHeight + paddingY * 2;
-				int bubbleX = location.getX() - paddingX;
-				int bubbleY = location.getY() - fm.getAscent() - paddingY;
-
-				graphics.setColor(bgColor);
-				int roundness = config.bubbleRoundness();
-				graphics.fillRoundRect(bubbleX, bubbleY, bubbleWidth, bubbleHeight, roundness, roundness);
-			}
-
-			drawText(graphics, text, location.getX(), location.getY(), fm, textColor);
 		}
 
 		return null;
+	}
+
+	private void renderNpcOverlay(Graphics2D graphics, FontMetrics fm, NPC npc, Player localPlayer, Actor currentInteracting, BossHealthData bossWidgetData)
+	{
+		if (npc == null || npc.getName() == null || npc.getName().trim().isEmpty())
+		{
+			return;
+		}
+
+		String npcName = npc.getName();
+
+		boolean bossBarActive = bossWidgetData != null
+			&& bossWidgetData.bossName != null
+			&& !bossWidgetData.bossName.trim().isEmpty()
+			&& bossNameMatches(npcName, bossWidgetData.bossName);
+
+		boolean isTarget = false;
+		if (currentInteracting == npc)
+		{
+			isTarget = true;
+		}
+		else if (localPlayer != null && npc.getInteracting() == localPlayer)
+		{
+			isTarget = true;
+		}
+		else if (lastTargetNpc == npc && !npc.isDead())
+		{
+			if (bossBarActive || System.currentTimeMillis() - lastTargetTime < 15000)
+			{
+				isTarget = true;
+			}
+		}
+		else if (bossBarActive && !npc.isDead() && lastTargetNpc == null)
+		{
+			isTarget = true;
+		}
+
+		// Filter based on NPC Display Mode
+		NpcDisplayMode npcMode = config.npcDisplayMode();
+		if (npcMode == null)
+		{
+			npcMode = NpcDisplayMode.SHOW_TARGET_NPC;
+		}
+
+		String nameList = config.npcNames();
+
+		switch (npcMode)
+		{
+			case SHOW_TARGET_NPC:
+				if (!isTarget)
+				{
+					return;
+				}
+				break;
+			case SHOW_WHITELISTED:
+				if (!isNameInList(npcName, nameList))
+				{
+					return;
+				}
+				break;
+			case SHOW_WHITELIST_TARGET:
+				if (!isTarget || !isNameInList(npcName, nameList))
+				{
+					return;
+				}
+				break;
+			case SHOW_ALL:
+			default:
+				break;
+		}
+
+		// Filter based on NPC Blacklist if specified
+		String blacklist = config.npcBlacklist();
+		if (blacklist != null && !blacklist.trim().isEmpty())
+		{
+			if (isNameInList(npcName, blacklist))
+			{
+				return;
+			}
+		}
+
+		int npcIndex = npc.getIndex();
+		int ratio = npc.getHealthRatio();
+		int scale = npc.getHealthScale();
+
+		if (npc.isDead())
+		{
+			ratio = 0;
+			if (scale <= 0 && lastHpMap.containsKey(npcIndex))
+			{
+				scale = lastHpMap.get(npcIndex)[1];
+			}
+			if (scale <= 0)
+			{
+				scale = 30;
+			}
+		}
+		else if (ratio >= 0 && scale > 0)
+		{
+			lastHpMap.put(npcIndex, new int[]{ratio, scale});
+		}
+		else if (config.showAfterHealthBarDisappears() && lastHpMap.containsKey(npcIndex))
+		{
+			int[] cached = lastHpMap.get(npcIndex);
+			ratio = cached[0];
+			scale = cached[1];
+		}
+		else if (config.showWithoutHealthBar())
+		{
+			ratio = 100;
+			scale = 100;
+		}
+
+		// Only display overlay if ratio >= 0 and scale > 0
+		if (ratio < 0 || scale <= 0)
+		{
+			return;
+		}
+
+		boolean isFull = (ratio == scale);
+		if (isFull && config.hideIfFull())
+		{
+			return;
+		}
+
+		int maxHp = 0;
+		int overrideCurrentHp = -1;
+
+		// Try standard RuneLite function first (npcManager.getHealth)
+		if (npcManager != null)
+		{
+			try
+			{
+				maxHp = npcManager.getHealth(npc.getId());
+				if (maxHp <= 0 && npc.getTransformedComposition() != null)
+				{
+					maxHp = npcManager.getHealth(npc.getTransformedComposition().getId());
+				}
+			}
+			catch (Exception ignored)
+			{
+				maxHp = 0;
+			}
+		}
+
+		// Correlate Boss Bar widget HP for scaled raid bosses & boss overlays
+		if (bossWidgetData != null && bossWidgetData.bossName != null && !bossWidgetData.bossName.trim().isEmpty())
+		{
+			boolean nameMatches = bossNameMatches(npcName, bossWidgetData.bossName);
+
+			if (nameMatches)
+			{
+				if (bossWidgetData.maxHp > 0)
+				{
+					maxHp = bossWidgetData.maxHp;
+				}
+
+				if (bossWidgetData.currentHp >= 0)
+				{
+					overrideCurrentHp = bossWidgetData.currentHp;
+				}
+			}
+		}
+
+		if (maxHp > 0)
+		{
+			npcIndexMaxHpCache.put(npcIndex, maxHp);
+			String baseName = getNormalizedBaseName(npcName);
+			if (!baseName.isEmpty())
+			{
+				bossMaxHpCache.put(baseName, maxHp);
+			}
+		}
+		else
+		{
+			if (npcIndexMaxHpCache.containsKey(npcIndex))
+			{
+				maxHp = npcIndexMaxHpCache.get(npcIndex);
+			}
+			else
+			{
+				String baseName = getNormalizedBaseName(npcName);
+				if (bossMaxHpCache.containsKey(baseName))
+				{
+					maxHp = bossMaxHpCache.get(baseName);
+				}
+			}
+		}
+
+		DisplayMode mode = config.displayMode();
+		if (mode == null)
+		{
+			mode = DisplayMode.BOTH;
+		}
+
+		if (isTarget)
+		{
+			TargetDisplayMode targetMode = config.targetDisplayMode();
+			if (targetMode != null && targetMode != TargetDisplayMode.DEFAULT)
+			{
+				switch (targetMode)
+				{
+					case HP_VALUE:
+						mode = DisplayMode.HP_VALUE;
+						break;
+					case HP_PERCENTAGE:
+						mode = DisplayMode.HP_PERCENTAGE;
+						break;
+					case BOTH:
+						mode = DisplayMode.BOTH;
+						break;
+				}
+			}
+		}
+
+		String text;
+		if (maxHp > 0)
+		{
+			int currentHp = (overrideCurrentHp >= 0) ? overrideCurrentHp : (int) Math.round((double) maxHp * ratio / scale);
+			if (currentHp == 0 && ratio > 0)
+			{
+				currentHp = 1;
+			}
+
+			String valStr = String.format("%d / %d", currentHp, maxHp);
+
+			String pctStr;
+			double hpFraction = (overrideCurrentHp >= 0 && maxHp > 0) ? ((double) currentHp / maxHp) : ((double) ratio / scale);
+			if (config.showDecimalPercentage())
+			{
+				pctStr = String.format("%.1f%%", hpFraction * 100.0);
+			}
+			else
+			{
+				int pctInt = (int) Math.round(hpFraction * 100.0);
+				if (pctInt == 0 && ratio > 0)
+				{
+					pctInt = 1;
+				}
+				pctStr = String.format("%d%%", pctInt);
+			}
+
+			switch (mode)
+			{
+				case HP_VALUE:
+					text = valStr;
+					break;
+				case HP_PERCENTAGE:
+					text = pctStr;
+					break;
+				case BOTH:
+				default:
+					text = String.format("%s (%s)", valStr, pctStr);
+					break;
+			}
+		}
+		else
+		{
+			if (config.showDecimalPercentage())
+			{
+				text = String.format("%.1f%%", ((double) ratio / scale) * 100.0);
+			}
+			else
+			{
+				int pctInt = (int) Math.round(((double) ratio / scale) * 100.0);
+				if (pctInt == 0 && ratio > 0)
+				{
+					pctInt = 1;
+				}
+				text = String.format("%d%%", pctInt);
+			}
+		}
+
+		// Determine dynamic canvas text location based on Overlay Position configuration
+		int logicalHeight = Math.max(0, npc.getLogicalHeight());
+		int baseHeight;
+		OverlayPositionMode posMode = config.overlayPosition();
+		if (posMode == null)
+		{
+			posMode = OverlayPositionMode.TOP;
+		}
+
+		switch (posMode)
+		{
+			case MIDDLE:
+				baseHeight = logicalHeight / 2;
+				break;
+			case BOTTOM:
+				baseHeight = 0;
+				break;
+			case TOP:
+			default:
+				baseHeight = logicalHeight;
+				break;
+		}
+
+		int zOffset = baseHeight + config.heightOffset();
+		Point textLocation = getSafeCanvasTextLocation(graphics, npc, text, zOffset);
+
+		if (textLocation == null)
+		{
+			textLocation = getSafeCanvasTextLocation(graphics, npc, text, baseHeight);
+		}
+		if (textLocation == null)
+		{
+			textLocation = getSafeCanvasTextLocation(graphics, npc, text, 0);
+		}
+
+		if (textLocation == null)
+		{
+			return;
+		}
+
+		int drawX = textLocation.getX();
+		int drawY = Math.max(20, textLocation.getY());
+		Point location = new Point(drawX, drawY);
+
+		// Determine text color (dynamic gradient vs static)
+		Color textColor;
+		if (config.dynamicTextColor())
+		{
+			double hpFraction;
+			if (maxHp > 0)
+			{
+				int calcCurrent = (overrideCurrentHp >= 0) ? overrideCurrentHp : (int) Math.round((double) maxHp * ratio / scale);
+				hpFraction = Math.max(0.0, Math.min(1.0, (double) calcCurrent / maxHp));
+			}
+			else
+			{
+				hpFraction = Math.max(0.0, Math.min(1.0, (double) ratio / scale));
+			}
+			textColor = getHpGradientColor(config.lowHpColor(), config.highHpColor(), hpFraction);
+		}
+		else
+		{
+			textColor = config.textColor();
+		}
+
+		// Optional background bubble
+		Color bgColor = config.bgColor();
+		if (bgColor.getAlpha() > 0)
+		{
+			int paddingX = config.bubblePaddingX();
+			int paddingY = config.bubblePaddingY();
+			int textWidth = fm.stringWidth(text);
+			int textHeight = fm.getHeight();
+
+			int bubbleWidth = textWidth + paddingX * 2;
+			int bubbleHeight = textHeight + paddingY * 2;
+			int bubbleX = location.getX() - paddingX;
+			int bubbleY = location.getY() - fm.getAscent() - paddingY;
+
+			graphics.setColor(bgColor);
+			int roundness = config.bubbleRoundness();
+			graphics.fillRoundRect(bubbleX, bubbleY, bubbleWidth, bubbleHeight, roundness, roundness);
+		}
+
+		drawText(graphics, text, location.getX(), location.getY(), fm, textColor);
+	}
+
+	private String getNormalizedBaseName(String name)
+	{
+		if (name == null)
+		{
+			return "";
+		}
+		String cleaned = name.replaceAll("\\(.*?\\)", "").trim().toLowerCase();
+		if (cleaned.contains("-"))
+		{
+			cleaned = cleaned.split("-")[0].trim();
+		}
+		if (cleaned.contains(":"))
+		{
+			cleaned = cleaned.split(":")[0].trim();
+		}
+		return cleaned;
 	}
 
 	private boolean bossNameMatches(String npcName, String widgetBossName)
@@ -461,9 +551,20 @@ public class NpcHealthTextOverlay extends Overlay
 			return true;
 		}
 
-		if (cleanNpc.startsWith(cleanWidget) || cleanWidget.startsWith(cleanNpc))
+		String baseNpc = getNormalizedBaseName(npcName);
+		String baseWidget = getNormalizedBaseName(widgetBossName);
+
+		if (!baseNpc.isEmpty() && baseNpc.equals(baseWidget))
 		{
 			return true;
+		}
+
+		if (baseNpc.length() >= 4 && baseWidget.length() >= 4)
+		{
+			if (baseNpc.startsWith(baseWidget) || baseWidget.startsWith(baseNpc))
+			{
+				return true;
+			}
 		}
 
 		return WildcardMatcher.matches(cleanWidget, cleanNpc) || WildcardMatcher.matches(cleanNpc, cleanWidget);
@@ -759,7 +860,7 @@ public class NpcHealthTextOverlay extends Overlay
 						{
 							hpValues = parsed;
 						}
-						else if (bossName == null && !cleanText.matches(".*\\d+.*"))
+						else if (bossName == null && cleanText.matches(".*[a-zA-Z].*"))
 						{
 							bossName = cleanText;
 						}
@@ -783,7 +884,7 @@ public class NpcHealthTextOverlay extends Overlay
 					{
 						hpValues = parsed;
 					}
-					else if (bossName == null && !cleanText.matches(".*\\d+.*"))
+					else if (bossName == null && cleanText.matches(".*[a-zA-Z].*"))
 					{
 						bossName = cleanText;
 					}
@@ -808,7 +909,7 @@ public class NpcHealthTextOverlay extends Overlay
 		}
 		try
 		{
-			String cleanText = text.replaceAll("<[^>]*>", "").trim();
+			String cleanText = text.replaceAll("<[^>]*>", "").replaceAll(",", "").trim();
 			Matcher matcher = HP_PATTERN.matcher(cleanText);
 			if (matcher.find())
 			{
