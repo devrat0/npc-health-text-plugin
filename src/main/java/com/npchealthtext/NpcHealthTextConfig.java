@@ -169,6 +169,18 @@ public interface NpcHealthTextConfig extends Config
 		return true;
 	}
 
+	@ConfigItem(
+		keyName = "positionOverrides",
+		name = "NPC Position Overrides",
+		description = "Comma-separated list of NPC names with optional positions (e.g. Great Olm*:Bottom, General Graardor:Middle, Corporeal Beast). Defaults to Bottom if unspecified. Supports wildcards",
+		position = 11,
+		section = "hpOptions"
+	)
+	default String positionOverrides()
+	{
+		return "";
+	}
+
 	// ──────────────────────────────────────────────
 	//  TEXT STYLE
 	// ──────────────────────────────────────────────

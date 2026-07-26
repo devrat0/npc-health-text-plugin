@@ -429,7 +429,11 @@ public class NpcHealthTextOverlay extends Overlay
 		// Determine dynamic canvas text location based on Overlay Position configuration
 		int logicalHeight = Math.max(0, npc.getLogicalHeight());
 		int baseHeight;
-		OverlayPositionMode posMode = config.overlayPosition();
+		OverlayPositionMode posMode = getPositionOverride(npcName);
+		if (posMode == null)
+		{
+			posMode = config.overlayPosition();
+		}
 		if (posMode == null)
 		{
 			posMode = OverlayPositionMode.TOP;
@@ -588,6 +592,58 @@ public class NpcHealthTextOverlay extends Overlay
 			}
 		}
 		return false;
+	}
+
+	OverlayPositionMode getPositionOverride(String npcName)
+	{
+		String rawOverrides = config.positionOverrides();
+		if (rawOverrides == null || rawOverrides.trim().isEmpty() || npcName == null)
+		{
+			return null;
+		}
+
+		String lowerName = npcName.trim().toLowerCase();
+		String[] parts = rawOverrides.split(",");
+		for (String part : parts)
+		{
+			String entry = part.trim();
+			if (entry.isEmpty())
+			{
+				continue;
+			}
+
+			String pattern = entry;
+			OverlayPositionMode mode = OverlayPositionMode.BOTTOM;
+
+			int colonIdx = entry.lastIndexOf(':');
+			if (colonIdx > 0 && colonIdx < entry.length() - 1)
+			{
+				pattern = entry.substring(0, colonIdx).trim();
+				String posStr = entry.substring(colonIdx + 1).trim().toLowerCase();
+				switch (posStr)
+				{
+					case "top":
+						mode = OverlayPositionMode.TOP;
+						break;
+					case "middle":
+					case "mid":
+					case "center":
+						mode = OverlayPositionMode.MIDDLE;
+						break;
+					case "bottom":
+					default:
+						mode = OverlayPositionMode.BOTTOM;
+						break;
+				}
+			}
+
+			if (!pattern.isEmpty() && WildcardMatcher.matches(pattern.toLowerCase(), lowerName))
+			{
+				return mode;
+			}
+		}
+
+		return null;
 	}
 
 	private Color getHpGradientColor(Color lowColor, Color highColor, double ratio)
