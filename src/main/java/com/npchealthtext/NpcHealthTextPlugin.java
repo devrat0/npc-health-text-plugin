@@ -9,6 +9,10 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 
+/**
+ * Main RuneLite Plugin entry point for NPC Health Text.
+ * Manages plugin lifecycle (startup/shutdown), overlay registration, and config binding.
+ */
 @Slf4j
 @PluginDescriptor(
 	name = "NPC Health Text",
