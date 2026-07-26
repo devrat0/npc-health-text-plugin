@@ -168,8 +168,10 @@ public class NpcHealthTextOverlay extends Overlay
 			}
 		}
 
-		// Scrape Boss Bar widget (ID 303) and count matching NPCs in scene
-		BossHealthManager.BossHealthData bossWidgetData = bossHealthManager.getBossHealthFromWidget(client);
+		// Scrape Boss Bar widget (ID 303) and count matching NPCs in scene if enabled
+		BossHealthManager.BossHealthData bossWidgetData = config.enableBossHealthScraping()
+			? bossHealthManager.getBossHealthFromWidget(client)
+			: null;
 
 		int matchingBossCount = 0;
 		if (bossWidgetData != null && bossWidgetData.getBossName() != null && !bossWidgetData.getBossName().trim().isEmpty())
@@ -389,7 +391,8 @@ public class NpcHealthTextOverlay extends Overlay
 			scale,
 			overrideActive,
 			mode,
-			config.showDecimalPercentage()
+			config.showDecimalPercentage(),
+			config.hidePercentageSymbol()
 		);
 
 		// Calculate dynamic canvas text location

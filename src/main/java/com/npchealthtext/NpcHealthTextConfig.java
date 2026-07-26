@@ -8,88 +8,56 @@ import net.runelite.client.config.ConfigItem;
 import net.runelite.client.config.ConfigSection;
 import net.runelite.client.config.Range;
 
+/**
+ * Configuration interface for NPC Health Text plugin.
+ * Organizes settings into logical sections with collapsible style panels and HTML text-wrapped tooltips.
+ */
 @ConfigGroup("npchealthtext")
 public interface NpcHealthTextConfig extends Config
 {
 	@ConfigSection(
-		name = "HP Options",
-		description = "Configure how the HP text overlay behaves",
+		name = "HP Format Options",
+		description = "<html>Configure format and timing options for HP text</html>",
 		position = 0
 	)
-	String hpSection = "hpOptions";
+	String hpFormattingSection = "hpFormatting";
 
 	@ConfigSection(
-		name = "Text Style",
-		description = "Configure the appearance of the HP text",
+		name = "Position & Placement",
+		description = "<html>Configure dynamic overlay positioning relative to NPCs</html>",
 		position = 1
+	)
+	String positioningSection = "positioning";
+
+	@ConfigSection(
+		name = "Text & Font Style",
+		description = "<html>Configure font, styling, and color gradients for HP text</html>",
+		position = 2,
+		closedByDefault = true
 	)
 	String textStyleSection = "textStyle";
 
 	@ConfigSection(
-		name = "Background Style",
-		description = "Configure optional background bubble around the text",
-		position = 2
+		name = "Background Bubble Style",
+		description = "<html>Configure optional background bubble container behind text</html>",
+		position = 3,
+		closedByDefault = true
 	)
 	String bgSection = "bgStyle";
 
 	// ──────────────────────────────────────────────
-	//  HP OPTIONS
+	//  HP FORMAT OPTIONS
 	// ──────────────────────────────────────────────
-
-	@ConfigItem(
-		keyName = "npcDisplayMode",
-		name = "NPC Display Mode",
-		description = "Choose which NPCs to show HP text on: Show Target NPC (only target), Show All (all visible NPCs), Show Whitelisted (all visible NPCs on the whitelist), or Show Whitelist Target (target NPC if on the whitelist)",
-		position = 0,
-		section = "hpOptions"
-	)
-	default NpcDisplayMode npcDisplayMode()
-	{
-		return NpcDisplayMode.SHOW_TARGET_NPC;
-	}
-
-	@ConfigItem(
-		keyName = "npcNames",
-		name = "NPC Whitelist",
-		description = "Comma-separated list of NPC names to display overlay for (used when NPC Display Mode is Show Whitelisted or Show Whitelist Target). Supports wildcards",
-		position = 1,
-		section = "hpOptions"
-	)
-	default String npcNames()
-	{
-		return "";
-	}
-
-	@ConfigItem(
-		keyName = "npcBlacklist",
-		name = "NPC Blacklist",
-		description = "Comma-separated list of NPC names to hide overlay for. Supports wildcards",
-		position = 2,
-		section = "hpOptions"
-	)
-	default String npcBlacklist()
-	{
-		return "";
-	}
-
-	@ConfigItem(
-		keyName = "hideIfFull",
-		name = "Hide if HP is Full",
-		description = "Hide the HP text overlay when the NPC is at full health",
-		position = 3,
-		section = "hpOptions"
-	)
-	default boolean hideIfFull()
-	{
-		return false;
-	}
 
 	@ConfigItem(
 		keyName = "displayMode",
 		name = "HP Text Format",
-		description = "Choose how health is displayed: HP Value (325/900), HP Percentage (36%), or Both (325/900 (36%))",
-		position = 4,
-		section = "hpOptions"
+		description = "<html>Choose how health is displayed:<br>"
+			+ "- HP Value: 325 / 900<br>"
+			+ "- HP Percentage: 36%<br>"
+			+ "- Both: 325 / 900 (36%)</html>",
+		position = 0,
+		section = "hpFormatting"
 	)
 	default DisplayMode displayMode()
 	{
@@ -99,9 +67,10 @@ public interface NpcHealthTextConfig extends Config
 	@ConfigItem(
 		keyName = "targetDisplayMode",
 		name = "Target HP Format",
-		description = "HP text format to use specifically for your active target or NPCs targeting you. Set to 'Default' to use standard HP Text Format",
-		position = 5,
-		section = "hpOptions"
+		description = "<html>HP text format to use specifically for your active target or NPCs targeting you.<br>"
+			+ "Set to 'Default' to use standard HP Text Format.</html>",
+		position = 1,
+		section = "hpFormatting"
 	)
 	default TargetDisplayMode targetDisplayMode()
 	{
@@ -111,9 +80,9 @@ public interface NpcHealthTextConfig extends Config
 	@ConfigItem(
 		keyName = "showDecimalPercentage",
 		name = "Show Decimal Percentage",
-		description = "Include 1 decimal place in percentage (e.g., 36.1% vs 36%)",
-		position = 6,
-		section = "hpOptions"
+		description = "<html>Include 1 decimal place in percentage display (e.g., 36.1% vs 36%)</html>",
+		position = 2,
+		section = "hpFormatting"
 	)
 	default boolean showDecimalPercentage()
 	{
@@ -121,36 +90,36 @@ public interface NpcHealthTextConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "overlayPosition",
-		name = "Overlay Position",
-		description = "Anchor position for HP text overlay relative to the NPC: Top (default), Middle, or Bottom",
-		position = 7,
-		section = "hpOptions"
+		keyName = "hidePercentageSymbol",
+		name = "Hide % Symbol",
+		description = "<html>Hide the '%' percentage symbol from the HP overlay text<br>"
+			+ "(e.g. '50' instead of '50%' or '150 / 300 (50.0)' instead of '150 / 300 (50.0%)').</html>",
+		position = 3,
+		section = "hpFormatting"
 	)
-	default OverlayPositionMode overlayPosition()
+	default boolean hidePercentageSymbol()
 	{
-		return OverlayPositionMode.TOP;
+		return false;
 	}
 
 	@ConfigItem(
-		keyName = "heightOffset",
-		name = "Height Offset",
-		description = "Fine-tune vertical offset in game height units relative to the selected Overlay Position",
-		position = 8,
-		section = "hpOptions"
+		keyName = "hideIfFull",
+		name = "Hide if HP is Full",
+		description = "<html>Hide the HP text overlay when the NPC is at full health (100% HP)</html>",
+		position = 4,
+		section = "hpFormatting"
 	)
-	@Range(min = -200, max = 200)
-	default int heightOffset()
+	default boolean hideIfFull()
 	{
-		return 36;
+		return false;
 	}
 
 	@ConfigItem(
 		keyName = "showAfterHealthBarDisappears",
 		name = "Keep Text After HP Bar Disappears",
-		description = "Continue displaying the health text overlay even after the in-game health bar times out and disappears",
-		position = 9,
-		section = "hpOptions"
+		description = "<html>Continue displaying the health text overlay even after the in-game health bar times out and disappears</html>",
+		position = 5,
+		section = "hpFormatting"
 	)
 	default boolean showAfterHealthBarDisappears()
 	{
@@ -160,9 +129,9 @@ public interface NpcHealthTextConfig extends Config
 	@ConfigItem(
 		keyName = "showWithoutHealthBar",
 		name = "Show Before HP Bar Appears",
-		description = "Display HP text overlay for visible NPCs even before they take damage or show an in-game overhead health bar (assumes 100% HP)",
-		position = 10,
-		section = "hpOptions"
+		description = "<html>Display HP text overlay for visible NPCs even before they take damage or show an in-game overhead health bar (assumes 100% HP)</html>",
+		position = 6,
+		section = "hpFormatting"
 	)
 	default boolean showWithoutHealthBar()
 	{
@@ -170,11 +139,101 @@ public interface NpcHealthTextConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "enableBossHealthScraping",
+		name = "Boss Health Scraping",
+		description = "<html>Correlate OSRS Boss Bar widget health to display exact current HP and scaled Max HP for bosses.<br>"
+			+ "When disabled, bosses display standard ratio/percentage health.</html>",
+		position = 7,
+		section = "hpFormatting"
+	)
+	default boolean enableBossHealthScraping()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "npcDisplayMode",
+		name = "NPC Display Mode",
+		description = "<html>Choose which NPCs to show HP text on:<br>"
+			+ "- Show Target NPC: Only your current target<br>"
+			+ "- Show All: All visible NPCs<br>"
+			+ "- Show Whitelisted: All visible NPCs on the whitelist<br>"
+			+ "- Show Whitelist Target: Target NPC if on the whitelist</html>",
+		position = 8,
+		section = "hpFormatting"
+	)
+	default NpcDisplayMode npcDisplayMode()
+	{
+		return NpcDisplayMode.SHOW_TARGET_NPC;
+	}
+
+	@ConfigItem(
+		keyName = "npcNames",
+		name = "NPC Whitelist",
+		description = "<html>Comma-separated list of NPC names to display overlay for.<br>"
+			+ "Used when NPC Display Mode is Show Whitelisted or Show Whitelist Target.<br>"
+			+ "Supports wildcards (e.g. Vanguard*, Great Olm*).</html>",
+		position = 9,
+		section = "hpFormatting"
+	)
+	default String npcNames()
+	{
+		return "";
+	}
+
+	@ConfigItem(
+		keyName = "npcBlacklist",
+		name = "NPC Blacklist",
+		description = "<html>Comma-separated list of NPC names to hide overlay for.<br>"
+			+ "Supports wildcards (e.g. Goblin*, Guard*).</html>",
+		position = 10,
+		section = "hpFormatting"
+	)
+	default String npcBlacklist()
+	{
+		return "";
+	}
+
+	// ──────────────────────────────────────────────
+	//  POSITION & PLACEMENT
+	// ──────────────────────────────────────────────
+
+	@ConfigItem(
+		keyName = "overlayPosition",
+		name = "Overlay Position",
+		description = "<html>Anchor position for HP text overlay relative to the NPC:<br>"
+			+ "- Top (default)<br>"
+			+ "- Middle<br>"
+			+ "- Bottom</html>",
+		position = 0,
+		section = "positioning"
+	)
+	default OverlayPositionMode overlayPosition()
+	{
+		return OverlayPositionMode.TOP;
+	}
+
+	@ConfigItem(
+		keyName = "heightOffset",
+		name = "Height Offset",
+		description = "<html>Fine-tune vertical offset in game height units relative to the selected Overlay Position</html>",
+		position = 1,
+		section = "positioning"
+	)
+	@Range(min = -200, max = 200)
+	default int heightOffset()
+	{
+		return 36;
+	}
+
+	@ConfigItem(
 		keyName = "positionOverrides",
 		name = "NPC Position Overrides",
-		description = "Comma-separated list of NPC names with optional positions (e.g. Great Olm*:Bottom, General Graardor:Middle, Corporeal Beast). Defaults to Bottom if unspecified. Supports wildcards",
-		position = 11,
-		section = "hpOptions"
+		description = "<html>Comma-separated list of NPC names with optional positions.<br>"
+			+ "e.g. Great Olm*:Bottom, General Graardor:Middle, Corporeal Beast<br>"
+			+ "Defaults to Bottom if unspecified. Supports wildcards.</html>",
+		position = 2,
+		section = "positioning"
 	)
 	default String positionOverrides()
 	{
@@ -182,13 +241,13 @@ public interface NpcHealthTextConfig extends Config
 	}
 
 	// ──────────────────────────────────────────────
-	//  TEXT STYLE
+	//  TEXT & FONT STYLE (CLOSED BY DEFAULT)
 	// ──────────────────────────────────────────────
 
 	@ConfigItem(
 		keyName = "fontType",
 		name = "Font",
-		description = "Font used for the HP overlay text",
+		description = "<html>Font used for the HP overlay text</html>",
 		position = 0,
 		section = "textStyle"
 	)
@@ -200,7 +259,7 @@ public interface NpcHealthTextConfig extends Config
 	@ConfigItem(
 		keyName = "customFontName",
 		name = "Font Name (if custom)",
-		description = "The name of the system font to use when 'Custom / System Font' is selected",
+		description = "<html>The name of the system font to use when 'Custom / System Font' is selected</html>",
 		position = 1,
 		section = "textStyle"
 	)
@@ -212,7 +271,7 @@ public interface NpcHealthTextConfig extends Config
 	@ConfigItem(
 		keyName = "fontSize",
 		name = "Font Size",
-		description = "Font size for the HP overlay text",
+		description = "<html>Font size for the HP overlay text</html>",
 		position = 2,
 		section = "textStyle"
 	)
@@ -225,7 +284,7 @@ public interface NpcHealthTextConfig extends Config
 	@ConfigItem(
 		keyName = "textStyle",
 		name = "Text Style",
-		description = "Visual style and accent options for the overlay text",
+		description = "<html>Visual style and accent options for the overlay text (Shadow Bold, Shadow, Outline, Outline Shadow)</html>",
 		position = 3,
 		section = "textStyle"
 	)
@@ -234,24 +293,11 @@ public interface NpcHealthTextConfig extends Config
 		return TextStyle.SHADOW_BOLD;
 	}
 
-	@Alpha
-	@ConfigItem(
-		keyName = "textColor",
-		name = "Static Text Color",
-		description = "The static color of the overlay text (used when Dynamic Text Color is disabled)",
-		position = 4,
-		section = "textStyle"
-	)
-	default Color textColor()
-	{
-		return Color.WHITE;
-	}
-
 	@ConfigItem(
 		keyName = "dynamicTextColor",
 		name = "Dynamic Text Color",
-		description = "Transition text color from Green (100% HP) to Yellow (50% HP) to Red (0% HP)",
-		position = 5,
+		description = "<html>Transition text color from Green (100% HP) to Yellow (50% HP) to Red (0% HP)</html>",
+		position = 4,
 		section = "textStyle"
 	)
 	default boolean dynamicTextColor()
@@ -263,8 +309,8 @@ public interface NpcHealthTextConfig extends Config
 	@ConfigItem(
 		keyName = "highHpColor",
 		name = "High HP Color",
-		description = "Text color at high/full health",
-		position = 6,
+		description = "<html>Text color at high/full health</html>",
+		position = 5,
 		section = "textStyle"
 	)
 	default Color highHpColor()
@@ -276,8 +322,8 @@ public interface NpcHealthTextConfig extends Config
 	@ConfigItem(
 		keyName = "lowHpColor",
 		name = "Low HP Color",
-		description = "Text color at low health",
-		position = 7,
+		description = "<html>Text color at low health</html>",
+		position = 6,
 		section = "textStyle"
 	)
 	default Color lowHpColor()
@@ -285,15 +331,28 @@ public interface NpcHealthTextConfig extends Config
 		return new Color(255, 0, 0);
 	}
 
+	@Alpha
+	@ConfigItem(
+		keyName = "textColor",
+		name = "Static Text Color",
+		description = "<html>The static color of the overlay text (used when Dynamic Text Color is disabled)</html>",
+		position = 7,
+		section = "textStyle"
+	)
+	default Color textColor()
+	{
+		return Color.WHITE;
+	}
+
 	// ──────────────────────────────────────────────
-	//  BACKGROUND STYLE
+	//  BACKGROUND BUBBLE STYLE (CLOSED BY DEFAULT)
 	// ──────────────────────────────────────────────
 
 	@Alpha
 	@ConfigItem(
 		keyName = "bgColor",
 		name = "Background Color",
-		description = "Background bubble color behind text. Set opacity to 0 for no background.",
+		description = "<html>Background bubble color behind text.<br>Set opacity to 0 for no background.</html>",
 		position = 0,
 		section = "bgStyle"
 	)
@@ -305,7 +364,7 @@ public interface NpcHealthTextConfig extends Config
 	@ConfigItem(
 		keyName = "bubblePaddingX",
 		name = "Padding (Horizontal)",
-		description = "Horizontal padding in pixels",
+		description = "<html>Horizontal padding in pixels for background bubble</html>",
 		position = 1,
 		section = "bgStyle"
 	)
@@ -318,7 +377,7 @@ public interface NpcHealthTextConfig extends Config
 	@ConfigItem(
 		keyName = "bubblePaddingY",
 		name = "Padding (Vertical)",
-		description = "Vertical padding in pixels",
+		description = "<html>Vertical padding in pixels for background bubble</html>",
 		position = 2,
 		section = "bgStyle"
 	)
@@ -331,7 +390,7 @@ public interface NpcHealthTextConfig extends Config
 	@ConfigItem(
 		keyName = "bubbleRoundness",
 		name = "Bubble Roundness",
-		description = "Corner radius of background bubble in pixels",
+		description = "<html>Corner radius of background bubble in pixels</html>",
 		position = 3,
 		section = "bgStyle"
 	)

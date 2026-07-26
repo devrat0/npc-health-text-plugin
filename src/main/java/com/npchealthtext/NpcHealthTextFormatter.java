@@ -18,6 +18,7 @@ public class NpcHealthTextFormatter
 	 * @param overrideCurrentHpActive Whether an exact Boss Bar widget HP override is active
 	 * @param mode DisplayMode format option (HP_VALUE, HP_PERCENTAGE, BOTH)
 	 * @param showDecimalPercentage Whether to include 1 decimal place in percentage outputs
+	 * @param hidePercentageSymbol Whether to omit the '%' percentage symbol
 	 * @return Formatted overlay text string
 	 */
 	public String formatHealthText(
@@ -27,12 +28,15 @@ public class NpcHealthTextFormatter
 		int scale,
 		boolean overrideCurrentHpActive,
 		DisplayMode mode,
-		boolean showDecimalPercentage)
+		boolean showDecimalPercentage,
+		boolean hidePercentageSymbol)
 	{
 		if (mode == null)
 		{
 			mode = DisplayMode.BOTH;
 		}
+
+		String pctSuffix = hidePercentageSymbol ? "" : "%";
 
 		// Known Max HP path (e.g. 325 / 900)
 		if (maxHp > 0)
@@ -46,7 +50,7 @@ public class NpcHealthTextFormatter
 
 			if (showDecimalPercentage)
 			{
-				pctStr = String.format("%.1f%%", hpFraction * 100.0);
+				pctStr = String.format("%.1f%s", hpFraction * 100.0, pctSuffix);
 			}
 			else
 			{
@@ -55,7 +59,7 @@ public class NpcHealthTextFormatter
 				{
 					pctInt = 1;
 				}
-				pctStr = String.format("%d%%", pctInt);
+				pctStr = String.format("%d%s", pctInt, pctSuffix);
 			}
 
 			switch (mode)
@@ -74,7 +78,7 @@ public class NpcHealthTextFormatter
 		{
 			if (showDecimalPercentage)
 			{
-				return String.format("%.1f%%", ((double) ratio / scale) * 100.0);
+				return String.format("%.1f%s", ((double) ratio / scale) * 100.0, pctSuffix);
 			}
 			else
 			{
@@ -83,9 +87,26 @@ public class NpcHealthTextFormatter
 				{
 					pctInt = 1;
 				}
-				return String.format("%d%%", pctInt);
+				return String.format("%d%s", pctInt, pctSuffix);
 			}
 		}
+	}
+
+	public String formatHealthText(
+		int currentHp,
+		int maxHp,
+		int ratio,
+		int scale,
+		boolean overrideCurrentHpActive,
+		DisplayMode mode,
+		boolean showDecimalPercentage)
+	{
+		return formatHealthText(currentHp, maxHp, ratio, scale, overrideActive(overrideCurrentHpActive), mode, showDecimalPercentage, false);
+	}
+
+	private boolean overrideActive(boolean val)
+	{
+		return val;
 	}
 
 	/**
