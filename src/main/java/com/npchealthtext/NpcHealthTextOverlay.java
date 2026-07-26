@@ -34,6 +34,8 @@ public class NpcHealthTextOverlay extends Overlay
 	private final NpcHealthTextConfig config;
 	private final NPCManager npcManager;
 	private final Map<Integer, int[]> lastHpMap = new ConcurrentHashMap<>();
+	private final Map<String, Integer> bossMaxHpCache = new ConcurrentHashMap<>();
+	private final Map<Integer, Integer> npcIndexMaxHpCache = new ConcurrentHashMap<>();
 
 	private NPC lastTargetNpc = null;
 	private long lastTargetTime = 0;
@@ -70,6 +72,7 @@ public class NpcHealthTextOverlay extends Overlay
 		{
 			int index = event.getNpc().getIndex();
 			lastHpMap.remove(index);
+			npcIndexMaxHpCache.remove(index);
 			if (lastTargetNpc == event.getNpc())
 			{
 				lastTargetNpc = null;
@@ -161,7 +164,10 @@ public class NpcHealthTextOverlay extends Overlay
 
 		String npcName = npc.getName();
 
-		boolean bossBarActive = bossWidgetData != null && bossNameMatches(npcName, bossWidgetData.bossName);
+		boolean bossBarActive = bossWidgetData != null
+			&& bossWidgetData.bossName != null
+			&& !bossWidgetData.bossName.trim().isEmpty()
+			&& bossNameMatches(npcName, bossWidgetData.bossName);
 
 		boolean isTarget = false;
 		if (currentInteracting == npc)
@@ -293,10 +299,9 @@ public class NpcHealthTextOverlay extends Overlay
 		}
 
 		// Correlate Boss Bar widget HP for scaled raid bosses & boss overlays
-		if (bossWidgetData != null)
+		if (bossWidgetData != null && bossWidgetData.bossName != null && !bossWidgetData.bossName.trim().isEmpty())
 		{
-			boolean nameMatches = (bossWidgetData.bossName == null || bossWidgetData.bossName.isEmpty()
-				|| bossNameMatches(npcName, bossWidgetData.bossName));
+			boolean nameMatches = bossNameMatches(npcName, bossWidgetData.bossName);
 
 			if (nameMatches)
 			{
@@ -305,9 +310,34 @@ public class NpcHealthTextOverlay extends Overlay
 					maxHp = bossWidgetData.maxHp;
 				}
 
-				if (isTarget && (currentInteracting == npc || lastTargetNpc == npc))
+				if (bossWidgetData.currentHp >= 0)
 				{
 					overrideCurrentHp = bossWidgetData.currentHp;
+				}
+			}
+		}
+
+		if (maxHp > 0)
+		{
+			npcIndexMaxHpCache.put(npcIndex, maxHp);
+			String baseName = getNormalizedBaseName(npcName);
+			if (!baseName.isEmpty())
+			{
+				bossMaxHpCache.put(baseName, maxHp);
+			}
+		}
+		else
+		{
+			if (npcIndexMaxHpCache.containsKey(npcIndex))
+			{
+				maxHp = npcIndexMaxHpCache.get(npcIndex);
+			}
+			else
+			{
+				String baseName = getNormalizedBaseName(npcName);
+				if (bossMaxHpCache.containsKey(baseName))
+				{
+					maxHp = bossMaxHpCache.get(baseName);
 				}
 			}
 		}
@@ -444,7 +474,16 @@ public class NpcHealthTextOverlay extends Overlay
 		Color textColor;
 		if (config.dynamicTextColor())
 		{
-			double hpFraction = Math.max(0.0, Math.min(1.0, (double) ratio / scale));
+			double hpFraction;
+			if (maxHp > 0)
+			{
+				int calcCurrent = (overrideCurrentHp >= 0) ? overrideCurrentHp : (int) Math.round((double) maxHp * ratio / scale);
+				hpFraction = Math.max(0.0, Math.min(1.0, (double) calcCurrent / maxHp));
+			}
+			else
+			{
+				hpFraction = Math.max(0.0, Math.min(1.0, (double) ratio / scale));
+			}
 			textColor = getHpGradientColor(config.lowHpColor(), config.highHpColor(), hpFraction);
 		}
 		else
@@ -474,6 +513,24 @@ public class NpcHealthTextOverlay extends Overlay
 		drawText(graphics, text, location.getX(), location.getY(), fm, textColor);
 	}
 
+	private String getNormalizedBaseName(String name)
+	{
+		if (name == null)
+		{
+			return "";
+		}
+		String cleaned = name.replaceAll("\\(.*?\\)", "").trim().toLowerCase();
+		if (cleaned.contains("-"))
+		{
+			cleaned = cleaned.split("-")[0].trim();
+		}
+		if (cleaned.contains(":"))
+		{
+			cleaned = cleaned.split(":")[0].trim();
+		}
+		return cleaned;
+	}
+
 	private boolean bossNameMatches(String npcName, String widgetBossName)
 	{
 		if (npcName == null || widgetBossName == null)
@@ -494,9 +551,20 @@ public class NpcHealthTextOverlay extends Overlay
 			return true;
 		}
 
-		if (cleanNpc.startsWith(cleanWidget) || cleanWidget.startsWith(cleanNpc))
+		String baseNpc = getNormalizedBaseName(npcName);
+		String baseWidget = getNormalizedBaseName(widgetBossName);
+
+		if (!baseNpc.isEmpty() && baseNpc.equals(baseWidget))
 		{
 			return true;
+		}
+
+		if (baseNpc.length() >= 4 && baseWidget.length() >= 4)
+		{
+			if (baseNpc.startsWith(baseWidget) || baseWidget.startsWith(baseNpc))
+			{
+				return true;
+			}
 		}
 
 		return WildcardMatcher.matches(cleanWidget, cleanNpc) || WildcardMatcher.matches(cleanNpc, cleanWidget);
@@ -792,7 +860,7 @@ public class NpcHealthTextOverlay extends Overlay
 						{
 							hpValues = parsed;
 						}
-						else if (bossName == null && !cleanText.matches(".*\\d+.*"))
+						else if (bossName == null && cleanText.matches(".*[a-zA-Z].*"))
 						{
 							bossName = cleanText;
 						}
@@ -816,7 +884,7 @@ public class NpcHealthTextOverlay extends Overlay
 					{
 						hpValues = parsed;
 					}
-					else if (bossName == null && !cleanText.matches(".*\\d+.*"))
+					else if (bossName == null && cleanText.matches(".*[a-zA-Z].*"))
 					{
 						bossName = cleanText;
 					}
@@ -841,7 +909,7 @@ public class NpcHealthTextOverlay extends Overlay
 		}
 		try
 		{
-			String cleanText = text.replaceAll("<[^>]*>", "").trim();
+			String cleanText = text.replaceAll("<[^>]*>", "").replaceAll(",", "").trim();
 			Matcher matcher = HP_PATTERN.matcher(cleanText);
 			if (matcher.find())
 			{
