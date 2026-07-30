@@ -364,7 +364,7 @@ public class NpcHealthTextOverlay extends Overlay
 				switch (targetMode)
 				{
 					case BOTH:
-						mode = DisplayMode.	;
+						mode = DisplayMode.BOTH	;
 						break;
 					case BOTH_VALUE_ONLY:
 						mode = DisplayMode.BOTH_VALUE_ONLY;

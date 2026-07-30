@@ -67,7 +67,7 @@ public interface NpcHealthTextConfig extends Config
 	)
 	default DisplayMode displayMode()
 	{
-		return DisplayMode.BOTH_PERCENT_FIRST_HP_SUFFIX;
+		return DisplayMode.BOTH;
 	}
 
 	@ConfigItem(
