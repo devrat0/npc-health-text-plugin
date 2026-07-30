@@ -51,37 +51,59 @@ public interface NpcHealthTextConfig extends Config
 
 	@ConfigItem(
 		keyName = "displayMode",
-		name = "HP Text Format",
+		name = "HP Format",
 		description = "<html>Choose how health is displayed:<br>"
-			+ "- HP Value: 325 / 900<br>"
-			+ "- HP Percentage: 36%<br>"
-			+ "- Both: 325 / 900 (36%)</html>",
+			+ "- Value/Max (%): 325 / 900 (36.1%)<br>"
+			+ "- Value (%): 325 (36.1%)<br>"
+			+ "- % (Value): 36.1% (325)<br>"
+			+ "- % (Value HP): 36.1% (325 HP)<br>"
+			+ "- % (Value/Max): 36.1% (325 / 900)<br>"
+			+ "- Value/Max: 325 / 900<br>"
+			+ "- Value Only: 325<br>"
+			+ "- % Only: 36.1%<br>"
+			+ "- Custom: Use Custom Template Format string below</html>",
 		position = 0,
 		section = "hpFormatting"
 	)
 	default DisplayMode displayMode()
 	{
-		return DisplayMode.HP_PERCENTAGE;
+		return DisplayMode.BOTH_PERCENT_FIRST_HP_SUFFIX;
 	}
 
 	@ConfigItem(
 		keyName = "targetDisplayMode",
-		name = "Target HP Format",
-		description = "<html>HP text format to use specifically for your active target or NPCs targeting you.<br>"
-			+ "Set to 'Default' to use standard HP Text Format.</html>",
+		name = "Target Format",
+		description = "<html>HP text format to use specifically for active targets or NPCs targeting you.<br>"
+			+ "Set to 'Default' to use standard HP Format.</html>",
 		position = 1,
 		section = "hpFormatting"
 	)
 	default TargetDisplayMode targetDisplayMode()
 	{
-		return TargetDisplayMode.BOTH;
+		return TargetDisplayMode.DEFAULT;
+	}
+
+	@ConfigItem(
+		keyName = "customHpFormat",
+		name = "Custom Template Format",
+		description = "<html>Template string used when HP Format or Target Format is set to 'Custom'.<br>"
+			+ "Placeholders:<br>"
+			+ "- <b>{curr}</b>: Current HP (e.g. 325)<br>"
+			+ "- <b>{max}</b>: Max HP (e.g. 900)<br>"
+			+ "- <b>{pct}</b>: Percentage (e.g. 36.1%)</html>",
+		position = 2,
+		section = "hpFormatting"
+	)
+	default String customHpFormat()
+	{
+		return "{pct} ({curr} HP)";
 	}
 
 	@ConfigItem(
 		keyName = "showDecimalPercentage",
 		name = "Show Decimal Percentage",
 		description = "<html>Include 1 decimal place in percentage display (e.g., 36.1% vs 36%)</html>",
-		position = 2,
+		position = 3,
 		section = "hpFormatting"
 	)
 	default boolean showDecimalPercentage()
@@ -94,7 +116,7 @@ public interface NpcHealthTextConfig extends Config
 		name = "Hide % Symbol",
 		description = "<html>Hide the '%' percentage symbol from the HP overlay text<br>"
 			+ "(e.g. '50' instead of '50%' or '150 / 300 (50.0)' instead of '150 / 300 (50.0%)').</html>",
-		position = 3,
+		position = 4,
 		section = "hpFormatting"
 	)
 	default boolean hidePercentageSymbol()
@@ -106,7 +128,7 @@ public interface NpcHealthTextConfig extends Config
 		keyName = "hideIfFull",
 		name = "Hide if HP is Full",
 		description = "<html>Hide the HP text overlay when the NPC is at full health (100% HP)</html>",
-		position = 4,
+		position = 5,
 		section = "hpFormatting"
 	)
 	default boolean hideIfFull()
@@ -116,9 +138,9 @@ public interface NpcHealthTextConfig extends Config
 
 	@ConfigItem(
 		keyName = "showAfterHealthBarDisappears",
-		name = "Keep Text After HP Bar Disappears",
+		name = "Keep Text After Bar Fade",
 		description = "<html>Continue displaying the health text overlay even after the in-game health bar times out and disappears</html>",
-		position = 5,
+		position = 6,
 		section = "hpFormatting"
 	)
 	default boolean showAfterHealthBarDisappears()
@@ -128,9 +150,9 @@ public interface NpcHealthTextConfig extends Config
 
 	@ConfigItem(
 		keyName = "showWithoutHealthBar",
-		name = "Show Before HP Bar Appears",
+		name = "Show Before Bar Appears",
 		description = "<html>Display HP text overlay for visible NPCs even before they take damage or show an in-game overhead health bar (assumes 100% HP)</html>",
-		position = 6,
+		position = 7,
 		section = "hpFormatting"
 	)
 	default boolean showWithoutHealthBar()
@@ -143,7 +165,7 @@ public interface NpcHealthTextConfig extends Config
 		name = "Boss Health Scraping",
 		description = "<html>Correlate OSRS Boss Bar widget health to display exact current HP and scaled Max HP for bosses.<br>"
 			+ "When disabled, bosses display standard ratio/percentage health.</html>",
-		position = 7,
+		position = 8,
 		section = "hpFormatting"
 	)
 	default boolean enableBossHealthScraping()
@@ -159,7 +181,7 @@ public interface NpcHealthTextConfig extends Config
 			+ "- Show All: All visible NPCs<br>"
 			+ "- Show Whitelisted: All visible NPCs on the whitelist<br>"
 			+ "- Show Whitelist Target: Target NPC if on the whitelist</html>",
-		position = 8,
+		position = 9,
 		section = "hpFormatting"
 	)
 	default NpcDisplayMode npcDisplayMode()
@@ -173,7 +195,7 @@ public interface NpcHealthTextConfig extends Config
 		description = "<html>Comma-separated list of NPC names to display overlay for.<br>"
 			+ "Used when NPC Display Mode is Show Whitelisted or Show Whitelist Target.<br>"
 			+ "Supports wildcards (e.g. Vanguard*, Great Olm*).</html>",
-		position = 9,
+		position = 10,
 		section = "hpFormatting"
 	)
 	default String npcNames()
@@ -186,7 +208,7 @@ public interface NpcHealthTextConfig extends Config
 		name = "NPC Blacklist",
 		description = "<html>Comma-separated list of NPC names to hide overlay for.<br>"
 			+ "Supports wildcards (e.g. Goblin*, Guard*).</html>",
-		position = 10,
+		position = 11,
 		section = "hpFormatting"
 	)
 	default String npcBlacklist()

@@ -3,22 +3,23 @@ package com.npchealthtext;
 import java.awt.Color;
 
 /**
- * Formats health values and percentage strings (HP_VALUE, HP_PERCENTAGE, BOTH, decimal percentage)
- * and calculates dynamic color gradients based on health ratios.
+ * Formats health values and percentage strings using presets or custom template placeholders
+ * ({curr}, {max}, {pct}) and calculates dynamic color gradients based on health ratios.
  */
 public class NpcHealthTextFormatter
 {
 	/**
-	 * Formats NPC health text according to the selected DisplayMode and percentage options.
+	 * Formats NPC health text according to the selected DisplayMode preset or custom template pattern.
 	 *
 	 * @param currentHp Current calculated or overridden HP
 	 * @param maxHp Max HP of the NPC (0 if unknown)
 	 * @param ratio Client health ratio
 	 * @param scale Client health scale
 	 * @param overrideCurrentHpActive Whether an exact Boss Bar widget HP override is active
-	 * @param mode DisplayMode format option (HP_VALUE, HP_PERCENTAGE, BOTH)
+	 * @param mode DisplayMode format option
 	 * @param showDecimalPercentage Whether to include 1 decimal place in percentage outputs
 	 * @param hidePercentageSymbol Whether to omit the '%' percentage symbol
+	 * @param customHpFormat Custom format template string (e.g. "{pct} ({curr} HP)")
 	 * @return Formatted overlay text string
 	 */
 	public String formatHealthText(
@@ -29,67 +30,91 @@ public class NpcHealthTextFormatter
 		boolean overrideCurrentHpActive,
 		DisplayMode mode,
 		boolean showDecimalPercentage,
-		boolean hidePercentageSymbol)
+		boolean hidePercentageSymbol,
+		String customHpFormat)
 	{
 		if (mode == null)
 		{
-			mode = DisplayMode.BOTH;
+			mode = DisplayMode.BOTH_PERCENT_FIRST_HP_SUFFIX;
 		}
 
 		String pctSuffix = hidePercentageSymbol ? "" : "%";
+		String pctStr;
 
-		// Known Max HP path (e.g. 325 / 900)
-		if (maxHp > 0)
+		double hpFraction = (overrideCurrentHpActive && maxHp > 0)
+			? ((double) currentHp / maxHp)
+			: ((double) ratio / scale);
+
+		if (showDecimalPercentage)
 		{
-			String valStr = String.format("%d / %d", currentHp, maxHp);
-
-			String pctStr;
-			double hpFraction = (overrideCurrentHpActive && maxHp > 0)
-				? ((double) currentHp / maxHp)
-				: ((double) ratio / scale);
-
-			if (showDecimalPercentage)
-			{
-				pctStr = String.format("%.1f%s", hpFraction * 100.0, pctSuffix);
-			}
-			else
-			{
-				int pctInt = (int) Math.round(hpFraction * 100.0);
-				if (pctInt == 0 && ratio > 0)
-				{
-					pctInt = 1;
-				}
-				pctStr = String.format("%d%s", pctInt, pctSuffix);
-			}
-
-			switch (mode)
-			{
-				case HP_VALUE:
-					return valStr;
-				case HP_PERCENTAGE:
-					return pctStr;
-				case BOTH:
-				default:
-					return String.format("%s (%s)", valStr, pctStr);
-			}
+			pctStr = String.format("%.1f%s", hpFraction * 100.0, pctSuffix);
 		}
-		// Unknown Max HP path (percentage fallback)
 		else
 		{
-			if (showDecimalPercentage)
+			int pctInt = (int) Math.round(hpFraction * 100.0);
+			if (pctInt == 0 && ratio > 0)
 			{
-				return String.format("%.1f%s", ((double) ratio / scale) * 100.0, pctSuffix);
+				pctInt = 1;
 			}
-			else
-			{
-				int pctInt = (int) Math.round(((double) ratio / scale) * 100.0);
-				if (pctInt == 0 && ratio > 0)
-				{
-					pctInt = 1;
-				}
-				return String.format("%d%s", pctInt, pctSuffix);
-			}
+			pctStr = String.format("%d%s", pctInt, pctSuffix);
 		}
+
+		String currStr = String.valueOf(currentHp);
+		String maxStr = maxHp > 0 ? String.valueOf(maxHp) : "";
+
+		// Unknown Max HP path fallback
+		if (maxHp <= 0 && mode != DisplayMode.CUSTOM)
+		{
+			return pctStr;
+		}
+
+		switch (mode)
+		{
+			case BOTH:
+				return String.format("%s / %s (%s)", currStr, maxStr, pctStr);
+			case BOTH_VALUE_ONLY:
+				return String.format("%s (%s)", currStr, pctStr);
+			case BOTH_PERCENT_FIRST_VALUE:
+				return String.format("%s (%s)", pctStr, currStr);
+			case BOTH_PERCENT_FIRST_HP_SUFFIX:
+				return String.format("%s (%s HP)", pctStr, currStr);
+			case BOTH_PERCENT_FIRST_MAX:
+				return String.format("%s (%s / %s)", pctStr, currStr, maxStr);
+			case HP_VALUE:
+				return String.format("%s / %s", currStr, maxStr);
+			case HP_VALUE_ONLY:
+				return currStr;
+			case HP_PERCENTAGE:
+				return pctStr;
+			case CUSTOM:
+				if (customHpFormat == null || customHpFormat.trim().isEmpty())
+				{
+					customHpFormat = "{pct} ({curr} HP)";
+				}
+				String output = customHpFormat;
+				output = output.replace("{curr}", currStr);
+				output = output.replace("{max}", maxHp > 0 ? maxStr : "?");
+				output = output.replace("{pct}", pctStr);
+				return output;
+			default:
+				return String.format("%s (%s HP)", pctStr, currStr);
+		}
+	}
+
+	public String formatHealthText(
+		int currentHp,
+		int maxHp,
+		int ratio,
+		int scale,
+		boolean overrideCurrentHpActive,
+		DisplayMode mode,
+		boolean showDecimalPercentage,
+		boolean hidePercentageSymbol)
+	{
+		return formatHealthText(
+			currentHp, maxHp, ratio, scale, overrideCurrentHpActive,
+			mode, showDecimalPercentage, hidePercentageSymbol, "{pct} ({curr} HP)"
+		);
 	}
 
 	public String formatHealthText(
@@ -101,12 +126,10 @@ public class NpcHealthTextFormatter
 		DisplayMode mode,
 		boolean showDecimalPercentage)
 	{
-		return formatHealthText(currentHp, maxHp, ratio, scale, overrideActive(overrideCurrentHpActive), mode, showDecimalPercentage, false);
-	}
-
-	private boolean overrideActive(boolean val)
-	{
-		return val;
+		return formatHealthText(
+			currentHp, maxHp, ratio, scale, overrideCurrentHpActive,
+			mode, showDecimalPercentage, false, "{pct} ({curr} HP)"
+		);
 	}
 
 	/**

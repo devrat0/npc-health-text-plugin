@@ -363,14 +363,32 @@ public class NpcHealthTextOverlay extends Overlay
 			{
 				switch (targetMode)
 				{
+					case BOTH:
+						mode = DisplayMode.	;
+						break;
+					case BOTH_VALUE_ONLY:
+						mode = DisplayMode.BOTH_VALUE_ONLY;
+						break;
+					case BOTH_PERCENT_FIRST_VALUE:
+						mode = DisplayMode.BOTH_PERCENT_FIRST_VALUE;
+						break;
+					case BOTH_PERCENT_FIRST_HP_SUFFIX:
+						mode = DisplayMode.BOTH_PERCENT_FIRST_HP_SUFFIX;
+						break;
+					case BOTH_PERCENT_FIRST_MAX:
+						mode = DisplayMode.BOTH_PERCENT_FIRST_MAX;
+						break;
 					case HP_VALUE:
 						mode = DisplayMode.HP_VALUE;
+						break;
+					case HP_VALUE_ONLY:
+						mode = DisplayMode.HP_VALUE_ONLY;
 						break;
 					case HP_PERCENTAGE:
 						mode = DisplayMode.HP_PERCENTAGE;
 						break;
-					case BOTH:
-						mode = DisplayMode.BOTH;
+					case CUSTOM:
+						mode = DisplayMode.CUSTOM;
 						break;
 				}
 			}
@@ -392,7 +410,8 @@ public class NpcHealthTextOverlay extends Overlay
 			overrideActive,
 			mode,
 			config.showDecimalPercentage(),
-			config.hidePercentageSymbol()
+			config.hidePercentageSymbol(),
+			config.customHpFormat()
 		);
 
 		// Calculate dynamic canvas text location
