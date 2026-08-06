@@ -161,6 +161,30 @@ public class NpcFontRenderer
 	 */
 	public void drawText(Graphics2D graphics, String text, int x, int y, FontMetrics fm, Color textColor, FontType type, int fontSize, TextStyle style)
 	{
+		drawText(graphics, text, x, y, fm, textColor, type, fontSize, style, null, 0, 0.0);
+	}
+
+	/**
+	 * Draws text onto canvas with optional damage pulse feathered glow aura effect.
+	 */
+	public void drawText(
+		Graphics2D graphics,
+		String text,
+		int x,
+		int y,
+		FontMetrics fm,
+		Color textColor,
+		FontType type,
+		int fontSize,
+		TextStyle style,
+		Color pulseColor,
+		int pulseIntensity,
+		double pulseFactor)
+	{
+		int maxRadius = (pulseColor != null && pulseIntensity > 0 && pulseFactor > 0.0)
+			? Math.max(1, Math.round((pulseIntensity / 2.0f) * (float) pulseFactor))
+			: 0;
+
 		if (isRuneScapeFont(type))
 		{
 			Font nativeFont = getNativeRuneScapeFont(type);
@@ -180,21 +204,31 @@ public class NpcFontRenderer
 					return;
 				}
 
+				int glowPad = 4 + maxRadius;
 				BufferedImage img = new BufferedImage(
-					nativeW + 8, nativeH + 8, BufferedImage.TYPE_INT_ARGB);
+					nativeW + glowPad * 2, nativeH + glowPad * 2, BufferedImage.TYPE_INT_ARGB);
 				Graphics2D g2d = img.createGraphics();
 				g2d.setFont(nativeFont);
 				g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
 				g2d.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_OFF);
 
-				drawStyledString(g2d, text, 4, nativeFm.getAscent() + 4, textColor, style, type);
+				int fontAscent = nativeFm.getAscent();
+				int textX = glowPad;
+				int textY = fontAscent + glowPad;
+
+				if (maxRadius > 0)
+				{
+					drawFeatheredGlow(g2d, text, textX, textY, pulseColor, pulseIntensity, pulseFactor);
+				}
+
+				drawStyledString(g2d, text, textX, textY, textColor, style, type);
 				g2d.dispose();
 
-				int scaledW = (nativeW + 8) * scale;
-				int scaledH = (nativeH + 8) * scale;
-				int topY = y - nativeFm.getAscent() * scale;
-				int drawX = x - 4 * scale;
-				int drawY = topY - 4 * scale;
+				int scaledW = (nativeW + glowPad * 2) * scale;
+				int scaledH = (nativeH + glowPad * 2) * scale;
+				int topY = y - fontAscent * scale;
+				int drawX = x - glowPad * scale;
+				int drawY = topY - glowPad * scale;
 
 				Object oldInterpolation = graphics.getRenderingHint(RenderingHints.KEY_INTERPOLATION);
 				graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
@@ -207,7 +241,51 @@ public class NpcFontRenderer
 			}
 		}
 
+		if (maxRadius > 0)
+		{
+			drawFeatheredGlow(graphics, text, x, y, pulseColor, pulseIntensity, pulseFactor);
+		}
+
 		drawStyledString(graphics, text, x, y, textColor, style, type);
+	}
+
+	/**
+	 * Renders concentric translucent feathered glow halo around text.
+	 */
+	public void drawFeatheredGlow(Graphics2D graphics, String text, int x, int y, Color pulseColor, int pulseIntensity, double pulseFactor)
+	{
+		if (pulseColor == null || pulseIntensity <= 0 || pulseFactor <= 0.0)
+		{
+			return;
+		}
+
+		int maxRadius = Math.max(1, Math.round((pulseIntensity / 2.0f) * (float) pulseFactor));
+		int baseAlpha = pulseColor.getAlpha();
+		int r = pulseColor.getRed();
+		int g = pulseColor.getGreen();
+		int b = pulseColor.getBlue();
+
+		for (int radius = maxRadius; radius >= 1; radius--)
+		{
+			double layerFactor = 1.0 - ((double) (radius - 1) / maxRadius);
+			int layerAlpha = (int) Math.round(baseAlpha * pulseFactor * layerFactor * 0.35);
+			if (layerAlpha <= 0)
+			{
+				continue;
+			}
+
+			graphics.setColor(new Color(r, g, b, Math.min(255, layerAlpha)));
+			for (int dx = -radius; dx <= radius; dx++)
+			{
+				for (int dy = -radius; dy <= radius; dy++)
+				{
+					if (dx * dx + dy * dy <= radius * radius + 1)
+					{
+						graphics.drawString(text, x + dx, y + dy);
+					}
+				}
+			}
+		}
 	}
 
 	private Font getNativeRuneScapeFont(FontType type)

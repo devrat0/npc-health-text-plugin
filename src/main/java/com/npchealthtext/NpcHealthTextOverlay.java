@@ -11,10 +11,13 @@ import javax.inject.Inject;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.Hitsplat;
+import net.runelite.api.HitsplatID;
 import net.runelite.api.NPC;
 import net.runelite.api.Player;
 import net.runelite.api.Point;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.HitsplatApplied;
 import net.runelite.api.events.NpcDespawned;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.game.NPCManager;
@@ -43,6 +46,7 @@ public class NpcHealthTextOverlay extends Overlay
 	private final Map<Integer, int[]> lastHpMap = new ConcurrentHashMap<>();
 	private final Map<String, Integer> bossMaxHpCache = new ConcurrentHashMap<>();
 	private final Map<Integer, Integer> npcIndexMaxHpCache = new ConcurrentHashMap<>();
+	private final Map<Integer, Long> pulseMap = new ConcurrentHashMap<>();
 
 	// Target tracking state
 	private NPC lastTargetNpc = null;
@@ -97,6 +101,7 @@ public class NpcHealthTextOverlay extends Overlay
 			int index = event.getNpc().getIndex();
 			lastHpMap.remove(index);
 			npcIndexMaxHpCache.remove(index);
+			pulseMap.remove(index);
 			if (lastTargetNpc == event.getNpc())
 			{
 				lastTargetNpc = null;
@@ -116,7 +121,36 @@ public class NpcHealthTextOverlay extends Overlay
 			lastHpMap.clear();
 			bossMaxHpCache.clear();
 			npcIndexMaxHpCache.clear();
+			pulseMap.clear();
 			lastTargetNpc = null;
+		}
+	}
+
+	/**
+	 * Triggers a pulse effect when the player lands a damage hit (> 0 damage) on an NPC.
+	 */
+	@Subscribe
+	public void onHitsplatApplied(HitsplatApplied event)
+	{
+		if (!config.enableDamagePulse() || event == null || event.getActor() == null || !(event.getActor() instanceof NPC))
+		{
+			return;
+		}
+
+		Hitsplat hitsplat = event.getHitsplat();
+		if (hitsplat == null || !hitsplat.isMine())
+		{
+			return;
+		}
+
+		int amount = hitsplat.getAmount();
+		int type = hitsplat.getHitsplatType();
+
+		// Only trigger pulse if damage is > 0 and not a heal event
+		if (amount > 0 && type != HitsplatID.HEAL)
+		{
+			NPC npc = (NPC) event.getActor();
+			pulseMap.put(npc.getIndex(), System.currentTimeMillis());
 		}
 	}
 
@@ -450,6 +484,31 @@ public class NpcHealthTextOverlay extends Overlay
 			textColor = config.textColor();
 		}
 
+		// Calculate pulse pop and glow animation state
+		int pulseIntensity = config.enableDamagePulse() ? config.pulseIntensity() : 0;
+		int pulseDuration = config.pulseDuration();
+		double pulseFactor = 0.0;
+		int popYOffset = 0;
+
+		if (pulseIntensity > 0 && pulseDuration > 0 && pulseMap.containsKey(npcIndex))
+		{
+			long startTime = pulseMap.get(npcIndex);
+			long elapsed = System.currentTimeMillis() - startTime;
+			if (elapsed < pulseDuration)
+			{
+				double progress = (double) elapsed / pulseDuration;
+				pulseFactor = 1.0 - progress;
+				popYOffset = (int) Math.round(2 * pulseFactor * (pulseIntensity / 5.0));
+			}
+			else
+			{
+				pulseMap.remove(npcIndex);
+			}
+		}
+
+		int drawX = location.getX();
+		int drawY = location.getY() - popYOffset;
+
 		// Render background bubble if enabled
 		Color bgColor = config.bgColor();
 		if (bgColor != null && bgColor.getAlpha() > 0)
@@ -461,11 +520,34 @@ public class NpcHealthTextOverlay extends Overlay
 
 			int bubbleWidth = textWidth + paddingX * 2;
 			int bubbleHeight = textHeight + paddingY * 2;
-			int bubbleX = location.getX() - paddingX;
-			int bubbleY = location.getY() - fm.getAscent() - paddingY;
+			int bubbleX = drawX - paddingX;
+			int bubbleY = drawY - fm.getAscent() - paddingY;
+			int roundness = config.bubbleRoundness();
+
+			// Render feathered glow behind bubble if pulsing
+			Color pulseColor = config.pulseColor();
+			if (pulseFactor > 0.0 && pulseColor != null && pulseIntensity > 0)
+			{
+				int maxRadius = Math.max(1, Math.round((pulseIntensity / 2.0f) * (float) pulseFactor));
+				int baseAlpha = pulseColor.getAlpha();
+				int r = pulseColor.getRed();
+				int g = pulseColor.getGreen();
+				int b = pulseColor.getBlue();
+
+				for (int rad = maxRadius; rad >= 1; rad--)
+				{
+					double layerFactor = 1.0 - ((double) (rad - 1) / maxRadius);
+					int layerAlpha = (int) Math.round(baseAlpha * pulseFactor * layerFactor * 0.4);
+					if (layerAlpha <= 0)
+					{
+						continue;
+					}
+					graphics.setColor(new Color(r, g, b, Math.min(255, layerAlpha)));
+					graphics.fillRoundRect(bubbleX - rad, bubbleY - rad, bubbleWidth + rad * 2, bubbleHeight + rad * 2, roundness + rad, roundness + rad);
+				}
+			}
 
 			graphics.setColor(bgColor);
-			int roundness = config.bubbleRoundness();
 			graphics.fillRoundRect(bubbleX, bubbleY, bubbleWidth, bubbleHeight, roundness, roundness);
 		}
 
@@ -473,13 +555,16 @@ public class NpcHealthTextOverlay extends Overlay
 		npcFontRenderer.drawText(
 			graphics,
 			text,
-			location.getX(),
-			location.getY(),
+			drawX,
+			drawY,
 			fm,
 			textColor,
 			config.fontType(),
 			config.fontSize(),
-			config.textStyle()
+			config.textStyle(),
+			config.pulseColor(),
+			pulseIntensity,
+			pulseFactor
 		);
 	}
 }

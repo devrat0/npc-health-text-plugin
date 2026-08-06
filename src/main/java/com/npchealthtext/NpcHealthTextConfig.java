@@ -45,6 +45,14 @@ public interface NpcHealthTextConfig extends Config
 	)
 	String bgSection = "bgStyle";
 
+	@ConfigSection(
+		name = "Damage Pulse Effect",
+		description = "<html>Configure visual pulse glow and pop effect when landing damage on NPCs</html>",
+		position = 4,
+		closedByDefault = false
+	)
+	String pulseSection = "pulseStyle";
+
 	// ──────────────────────────────────────────────
 	//  HP FORMAT OPTIONS
 	// ──────────────────────────────────────────────
@@ -420,5 +428,60 @@ public interface NpcHealthTextConfig extends Config
 	default int bubbleRoundness()
 	{
 		return 6;
+	}
+
+	// ──────────────────────────────────────────────
+	//  DAMAGE PULSE EFFECT
+	// ──────────────────────────────────────────────
+
+	@ConfigItem(
+		keyName = "enableDamagePulse",
+		name = "Enable Damage Pulse",
+		description = "<html>Pop and glow the HP text overlay when landing damage (>0) on an NPC</html>",
+		position = 0,
+		section = "pulseStyle"
+	)
+	default boolean enableDamagePulse()
+	{
+		return false;
+	}
+
+	@Alpha
+	@ConfigItem(
+		keyName = "pulseColor",
+		name = "Pulse Color",
+		description = "<html>Glow color when HP text pulses on damage</html>",
+		position = 1,
+		section = "pulseStyle"
+	)
+	default Color pulseColor()
+	{
+		return new Color(255, 0, 0, 220);
+	}
+
+	@ConfigItem(
+		keyName = "pulseIntensity",
+		name = "Pulse Intensity",
+		description = "<html>Thickness and pop magnitude of the damage pulse (set to 0 to disable)</html>",
+		position = 2,
+		section = "pulseStyle"
+	)
+	@Range(min = 0, max = 10)
+	default int pulseIntensity()
+	{
+		return 7;
+	}
+
+	@ConfigItem(
+		keyName = "pulseDuration",
+		name = "Pulse Duration (ms)",
+		description = "<html>Duration of the pulse animation in milliseconds</html>",
+		position = 3,
+		section = "pulseStyle"
+	)
+	@Range(min = 100, max = 1000)
+	default int pulseDuration()
+	{
+		return 600;
 	}
 }
